@@ -61,7 +61,7 @@ The main script (`app/main.py`) performs the following sequence:
 
 ### Key Features of the Script
 - Explicit visible-camera/TCA-channel pairing in `config/inspection_layout.json`
-- Calibrated visible and thermal projection into one vehicle-coordinate canvas
+- Fixed side-by-side sensor strip placed repeatedly along vehicle travel into one underbody canvas
 - Fixed Celsius heatmap scale, temperature array, coverage mask, and capture metadata
 - Motion-derived speed validation so passes with gaps are rejected rather than stitched incorrectly
 - All inspection artifacts saved with timestamps in `/captures`
@@ -70,10 +70,10 @@ The main script (`app/main.py`) performs the following sequence:
 
 `config/inspection_layout.json` is intentionally shipped with `"calibrated": false`, so the scanner will not create uncalibrated inspection images. Hardware engineers must populate it before deployment:
 
-- `pairs` explicitly maps a visible camera index to a TCA9548A channel. Add a third center pair as another object; do not rely on matching indexes.
-- `visible_to_canvas` and `thermal_to_canvas` are each pair's 3x3 homographies into the shared top-down canvas.
+- `pairs` explicitly maps a visible source descriptor to a TCA9548A channel. Add a third center pair as another object; do not rely on matching indexes.
+- `visible_to_strip` and `thermal_to_strip` are each pair's 3x3 homographies into the fixed cross-car sensor strip.
 - `motion_to_canvas` converts phase-correlation movement from the selected motion camera into canvas pixels, including direction and scale.
-- `canvas` and `inspection_roi` define the final mosaic extent. Size them for the union of all camera fields, not one camera frame; adjacent fields should overlap only enough for calibration and blending.
+- `strip` defines the fixed union of side-by-side camera fields. `canvas` and `inspection_roi` define the final full-underbody extent as successive strips are placed along travel.
 - `max_traversal_speed_mps` and `max_motion_step_pixels` reject a pass when consecutive samples cannot cover the canvas without a gap.
 
 The RCWL-0516 is presence-only; it cannot report vehicle speed. The application estimates speed from registered camera motion and records average and maximum speed in each event's metadata JSON.

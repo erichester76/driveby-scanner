@@ -27,8 +27,8 @@ PAGE = """<!doctype html>
 </style></head><body><main>
 <header><div><div class="mode" id="mode"></div><h1>Undercarriage Scan Console</h1></div><div class="status" id="status">Connecting...</div></header>
 <div class="notice" id="notice"></div>
-<section id="bench"><div class="controls"><div class="radar" id="radarIndicator">Radar: not wired</div><button id="snapshot">Save bench snapshot</button><button class="secondary" id="toggle">Open corrected layer canvas</button></div><div class="grid" id="feeds"></div>
-<div class="panel calibration" id="calibration"><h2>Corrected multi-layer canvas</h2><p class="help"><strong>Place sources directly:</strong> click a layer, drag it into its physical position, retain the measured overlap with neighboring fields, then use Save all layers. The canvas is the deployed inspection coordinate system, so direct placement is the anchor. Every available source is rectified with configured lens coefficients before rendering.</p><div class="workspace"><div><div class="layers" id="layers"></div><div class="canvas-wrap"><canvas id="mosaicCanvas"></canvas></div></div><aside><h2 id="selectedTitle">Select a layer</h2><div class="controls"><label>Opacity <input id="alpha" type="range" min="0.1" max="1" value="0.6" step="0.05"></label><label>Scale <input id="scale" type="range" min="0.5" max="1.8" value="1" step="0.005"></label><label>Rotation <input id="rotation" type="range" min="-30" max="30" value="0" step="0.1"></label></div><div class="controls"><button class="secondary" id="flipHorizontal">Flip horizontal</button><button class="secondary" id="flipVertical">Flip vertical</button></div><div class="controls"><button class="secondary" id="resetLayer">Reset layer</button><button id="saveAll">Save all layers</button></div><div class="readout" id="transformReadout"></div><p class="help">A <code>raw</code> source has no lens coefficients yet. Direct placement still saves its position, but calibrate lens coefficients before trusting the final geometric alignment.</p><span class="status" id="calibrationStatus"></span></aside></div></div></section>
+<section id="bench"><div class="controls"><div class="radar" id="radarIndicator">Radar: not wired</div><button id="snapshot">Save bench snapshot</button><button class="secondary" id="toggle">Open strip editor</button></div><div class="grid" id="feeds"></div>
+<div class="panel calibration" id="calibration"><h2>Fixed Sensor Strip Editor</h2><p class="help"><strong>Build the scanner light bar:</strong> align left, center, and right sources into one fixed cross-car strip with only their measured overlap. This saves fixed <code>source -> strip</code> geometry. During a pass, the car moves over this fixed strip, so each captured strip is placed farther along the travel axis to create the complete underbody image.</p><div class="workspace"><div><div class="layers" id="layers"></div><div class="canvas-wrap"><canvas id="mosaicCanvas"></canvas></div></div><aside><h2 id="selectedTitle">Select a layer</h2><div class="controls"><label>Opacity <input id="alpha" type="range" min="0.1" max="1" value="0.6" step="0.05"></label><label>Scale <input id="scale" type="range" min="0.5" max="1.8" value="1" step="0.005"></label><label>Rotation <input id="rotation" type="range" min="-30" max="30" value="0" step="0.1"></label></div><div class="controls"><button class="secondary" id="flipHorizontal">Flip horizontal</button><button class="secondary" id="flipVertical">Flip vertical</button></div><div class="controls"><button class="secondary" id="resetLayer">Reset layer</button><button id="saveAll">Save strip layout</button></div><div class="readout" id="transformReadout"></div><p class="help">A <code>raw</code> source has no lens coefficients yet. Direct placement still saves its strip position, but calibrate lens coefficients before trusting the final geometric alignment.</p><span class="status" id="calibrationStatus"></span></aside></div></div></section>
 <section><h2>Technician inspections</h2><div class="scans" id="scans"></div></section>
 </main><script>
 const mode={{ mode|tojson }};let info={},layers=[],selectedId=null,drag=null,canvasScale=1,revision=null;
@@ -232,7 +232,7 @@ def thermal_preview(frame, thermal_range):
 
 
 def source_key(source):
-    return f"{source}_to_canvas"
+    return f"{source}_to_strip"
 
 
 def parse_bench_visible_source(source):
@@ -352,7 +352,7 @@ def create_app(mode):
                 "message": startup_error or ("Hardware preview ready" if bench else "Inspection artifact viewer ready"),
                 "calibrated": bool(layout.get("calibrated")),
                 "revision": layout_revision(layout),
-                "canvas": layout["canvas"],
+                "strip": layout["strip"],
                 "visible": [
                     {**source, "source_id": visible["id"]}
                     for source, visible, _camera in bench.cameras.values()

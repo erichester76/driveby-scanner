@@ -5,6 +5,11 @@
     "height": 8192,
     "pixels_per_meter": 1000
   },
+  "strip": {
+    "width": 4096,
+    "height": 1296,
+    "origin_in_canvas": [0, 0]
+  },
   "motion_pair_name": "left",
   "motion_roi": [512, 512, 3072, 3072],
   "motion_to_canvas": null,
@@ -33,10 +38,10 @@
       "thermal_tca_channel": 0,
       "visible_camera_matrix": null,
       "visible_distortion_coefficients": null,
-      "visible_to_canvas": null,
+      "visible_to_strip": null,
       "thermal_camera_matrix": null,
       "thermal_distortion_coefficients": null,
-      "thermal_to_canvas": null
+      "thermal_to_strip": null
     },
     {
       "name": "right",
@@ -48,10 +53,10 @@
       "thermal_tca_channel": 1,
       "visible_camera_matrix": null,
       "visible_distortion_coefficients": null,
-      "visible_to_canvas": null,
+      "visible_to_strip": null,
       "thermal_camera_matrix": null,
       "thermal_distortion_coefficients": null,
-      "thermal_to_canvas": null
+      "thermal_to_strip": null
     },
     {
       "name": "center",
@@ -63,10 +68,10 @@
       "thermal_tca_channel": 2,
       "visible_camera_matrix": null,
       "visible_distortion_coefficients": null,
-      "visible_to_canvas": null,
+      "visible_to_strip": null,
       "thermal_camera_matrix": null,
       "thermal_distortion_coefficients": null,
-      "thermal_to_canvas": null
+      "thermal_to_strip": null
     }
   ]
 }

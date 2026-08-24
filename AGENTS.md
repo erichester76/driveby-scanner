@@ -9,7 +9,7 @@
 - The uncalibrated `center` layout entry is a V4L2 USB-camera template paired to thermal channel `2`; replace its stable by-id path and add the matching `/dev/videoX` Compose mapping before deployment.
 - Bench mode can optionally read RCWL-0516 GPIO17 when `config/bench.json` enables its radar entry; this is status-only and must not start deployed capture.
 - The capture loop is hardware-triggered: wait for RCWL-0516 to clear -> wait for detection -> LEDs on -> capture until it clears or `maximum_capture_duration_seconds` -> LEDs off -> validate movement/coverage -> write one inspection mosaic. Keep `SIGTERM`/exception cleanup of LEDs and `Picamera2` instances reliable when changing this flow.
-- Tuning constants, BCM GPIO pins, thermal dimensions, output location, and the calibrated-mosaic flow are in `app/main.py`. Captures are written to `captures/` at the repository root.
+- Tuning constants, BCM GPIO pins, thermal dimensions, output location, and the calibrated strip-to-mosaic flow are in `app/main.py`. Captures are written to `captures/` at the repository root.
 
 ## Hardware Constraints
 

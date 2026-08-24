@@ -1,4 +1,4 @@
-# Inspection Mosaic Calibration
+# Inspection Strip Calibration
 
 The scanner will not create an inspection image until
 `config/inspection_layout.json` has calibrated transforms and
@@ -13,82 +13,78 @@ with a `visible` descriptor and a TCA9548A channel. CSI/HAT sources use
 `{"kind": "v4l2", "device": "/dev/v4l/by-id/...", "size": [...]}`. For a
 USB source, also map the resolved `/dev/videoX` in `docker-compose.yml`.
 
-## Canvas Transforms
+## Strip And Canvas Geometry
 
-Use a fixed top-down calibration target at the undercarriage plane. The shared
-canvas uses pixels as its coordinate system.
+The system uses two coordinate systems:
+
+- `strip` is one fixed cross-car slice. The strip editor aligns left, center,
+  and right visible/thermal sources side-by-side with deliberate overlap.
+- `canvas` is the final full-underbody image. During a vehicle pass, the
+  application places each captured fixed strip farther along the calibrated
+  travel axis.
+
+Use a calibration target at the undercarriage plane. Populate:
 
 - `visible_camera_matrix` and `visible_distortion_coefficients`: visible-lens
-  intrinsics at the configured 2304x1296 capture resolution. The application
-  undistorts before projection and motion registration.
-- `visible_to_canvas`: 3x3 homography from each undistorted visible image to
-  the canvas.
+  intrinsics at the configured visible-source resolution. The application
+  undistorts before strip projection and motion registration.
+- `visible_to_strip`: 3x3 homography from each undistorted visible image to
+  the fixed cross-car strip.
 - `thermal_camera_matrix` and `thermal_distortion_coefficients`: thermal-lens
   intrinsics at 32x24.
-- `thermal_to_canvas`: 3x3 homography from each 32x24 thermal frame to the
-  same canvas after undistortion. Measure it independently; resizing thermal
-  data to the visible image is not calibration.
+- `thermal_to_strip`: 3x3 homography from each undistorted thermal frame to
+  the same fixed strip. Resizing thermal data to a visible image is not
+  calibration.
 - `motion_to_canvas`: 2x2 transform from the motion camera's phase-correlation
-  displacement to canvas displacement. It sets scale and travel direction.
-- `pixels_per_meter`: measured canvas scale used for traversal-speed reporting.
+  displacement to final-canvas displacement. It sets travel direction and
+  physical scale.
+- `pixels_per_meter`: measured final-canvas scale used for speed reporting.
 
-Keep a calibrated target image and transform-generation record with the
-installation. Recalibrate after changing camera positions, focus, sensor
-orientation, or the imaging-plane height.
+Recalibrate after changing camera positions, focus, sensor orientation, or the
+imaging-plane height.
 
-## Browser Registration Workbench
+## Browser Strip Editor
 
-Place each source directly in the corrected multi-layer canvas. The canvas is
-the same coordinate system used by deployed capture, so dragging a layer into
-its physical position establishes its canvas anchor. Arrange camera fields
-side-by-side with the measured overlap, then use Save All to write every source
-transform together.
+Place each source directly in the fixed sensor strip. Arrange source fields
+beside one another with the measured overlap. Do not represent vehicle travel
+in this editor: direct placement saves only fixed `source -> strip` geometry.
+
+The editor rectifies each layer when intrinsics are present, shows every source
+available in bench mode, and lets the operator select one layer at a time.
+`Save strip layout` writes all directly placed source-to-strip transforms
+atomically and preserves `calibrated: false`.
 
 Map bench thermal sources to their physical pair with `pair_name` in
-`config/bench.json`. Only mapped thermal sources can be used in the drag
-workbench. The display is for fine adjustment; verify the transform with the
-calibration target and record the result before setting `calibrated: true`.
+`config/bench.json`. A source without a deployed pair can be previewed but
+cannot enter a deployed strip.
 
-The corrected multi-layer canvas uses the same `source -> canvas` transform
-contract as deployed capture. It rectifies each layer when its intrinsics are
-present, shows every configured source available in bench mode, and lets the
-operator select one layer at a time. Save All writes directly placed source
-transforms atomically and preserves `calibrated: false`.
-
-The final inspection size is `inspection_roi`, not a camera frame size. Make
-the canvas and ROI wide enough for all fixed camera fields plus their overlap;
-the deployed mosaic projects every calibrated pair into that larger canvas.
+Set `strip.width` and `strip.height` for the union of fixed source fields. Set
+`canvas` and `inspection_roi` for the complete underbody. Deployed capture
+repeats the calibrated strip along the vehicle travel path to fill that canvas.
 
 ## Coverage And Speed
 
-Set `inspection_roi` to the vehicle area a technician must review. Set coverage
-thresholds only after measuring real captures.
-
-Set `max_motion_step_pixels` no larger than the usable longitudinal overlap
-between adjacent frame projections. For example, with 200 canvas pixels of
-reliable overlap, use at most 100 pixels to retain 50% overlap. Set
-`max_traversal_speed_mps` to the same limit expressed in physical units:
+Set `max_motion_step_pixels` no larger than usable longitudinal strip overlap.
+For example, with 200 canvas pixels of reliable overlap, use at most 100 pixels
+to retain 50% overlap. Set `max_traversal_speed_mps` to the same limit in
+physical units:
 
 ```text
 max speed = max_motion_step_pixels / pixels_per_meter / worst_observed_capture_interval
 ```
 
-The application measures each frame-to-frame displacement and elapsed time. It
+The application measures frame-to-frame displacement and elapsed time. It
 rejects passes with excessive speed, low registration confidence, source skew,
 or incomplete configured coverage. RCWL-0516 only detects presence and cannot
 measure speed. `minimum_capture_duration_seconds` and
-`maximum_capture_duration_seconds` bound the radar-held capture window: a slow
-vehicle can be captured until it clears the sensor, while a stuck trigger cannot
-create an unbounded capture.
+`maximum_capture_duration_seconds` bound the radar-held capture window.
 
-Set `max_pair_skew_seconds` from the worst measured time between each mapped
-visible capture and its MLX90640 read. The scanner captures each configured
-pair consecutively; a pass is rejected when the observed skew exceeds this
-calibrated limit.
+Set `max_pair_skew_seconds` from the worst measured interval between a mapped
+visible capture and its MLX90640 read.
 
 ## Thermal Interpretation
 
 `thermal_range_c` is a fixed technician-visible Celsius scale. Set it to the
-review range appropriate for the vehicle and thermal sensor. The mosaic also
-writes raw mapped temperatures as `.npy` and a thermal coverage mask; absence
-of color in the mask is missing data, not a cool measurement.
+appropriate review range. The mosaic writes raw mapped temperatures as `.npy`
+and a thermal coverage mask; missing mask coverage is absent data, not a cool
+measurement.

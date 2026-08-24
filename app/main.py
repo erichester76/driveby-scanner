@@ -34,7 +34,7 @@ def load_layout():
         layout = json.load(layout_file)
 
     required = {
-        "canvas", "motion_pair_name", "motion_roi", "min_motion_response",
+        "canvas", "strip", "motion_pair_name", "motion_roi", "min_motion_response",
         "motion_to_canvas", "max_motion_step_pixels", "max_traversal_speed_mps", "max_pair_skew_seconds",
         "capture_interval_seconds", "inspection_roi", "minimum_visible_coverage", "minimum_thermal_coverage",
         "minimum_capture_duration_seconds", "maximum_capture_duration_seconds", "minimum_visible_sharpness",
@@ -49,6 +49,12 @@ def load_layout():
     canvas = layout["canvas"]
     if canvas["width"] <= 0 or canvas["height"] <= 0 or canvas["pixels_per_meter"] <= 0:
         raise ValueError("Canvas dimensions and pixels_per_meter must be positive")
+    strip = layout["strip"]
+    if strip["width"] <= 0 or strip["height"] <= 0 or len(strip["origin_in_canvas"]) != 2:
+        raise ValueError("Strip dimensions and origin_in_canvas are invalid")
+    strip_x, strip_y = strip["origin_in_canvas"]
+    if strip_x < 0 or strip_y < 0 or strip_x + strip["width"] > canvas["width"] or strip_y + strip["height"] > canvas["height"]:
+        raise ValueError("Strip must fit inside the final canvas at origin_in_canvas")
     if layout["max_traversal_speed_mps"] <= 0:
         raise ValueError("max_traversal_speed_mps must be positive")
     if layout["max_pair_skew_seconds"] <= 0:
@@ -74,8 +80,8 @@ def load_layout():
     for pair in layout["pairs"]:
         for key in (
             "name", "visible", "thermal_tca_channel", "visible_camera_matrix",
-            "visible_distortion_coefficients", "visible_to_canvas", "thermal_camera_matrix",
-            "thermal_distortion_coefficients", "thermal_to_canvas",
+            "visible_distortion_coefficients", "visible_to_strip", "thermal_camera_matrix",
+            "thermal_distortion_coefficients", "thermal_to_strip",
         ):
             if key not in pair:
                 raise ValueError(f"Pair is missing required setting: {key}")
@@ -88,10 +94,10 @@ def load_layout():
         pair["visible"] = visible
         pair["visible_camera_matrix"] = parse_camera_matrix(pair["visible_camera_matrix"], f"{pair['name']} visible_camera_matrix")
         pair["visible_distortion_coefficients"] = parse_distortion(pair["visible_distortion_coefficients"], f"{pair['name']} visible_distortion_coefficients")
-        pair["visible_to_canvas"] = parse_homography(pair["visible_to_canvas"], f"{pair['name']} visible_to_canvas")
+        pair["visible_to_strip"] = parse_homography(pair["visible_to_strip"], f"{pair['name']} visible_to_strip")
         pair["thermal_camera_matrix"] = parse_camera_matrix(pair["thermal_camera_matrix"], f"{pair['name']} thermal_camera_matrix")
         pair["thermal_distortion_coefficients"] = parse_distortion(pair["thermal_distortion_coefficients"], f"{pair['name']} thermal_distortion_coefficients")
-        pair["thermal_to_canvas"] = parse_homography(pair["thermal_to_canvas"], f"{pair['name']} thermal_to_canvas")
+        pair["thermal_to_strip"] = parse_homography(pair["thermal_to_strip"], f"{pair['name']} thermal_to_strip")
 
     if layout["motion_pair_name"] not in names:
         raise ValueError("motion_pair_name must reference a configured pair")
@@ -297,9 +303,9 @@ def validate_event(frame_sets, layout):
     }
 
 
-def project_into_canvas(image, homography, offset, canvas_size, interpolation):
-    translate = np.array([[1, 0, offset[0]], [0, 1, offset[1]], [0, 0, 1]], dtype=np.float32)
-    transform = translate @ homography
+def project_into_canvas(image, strip_transform, strip_position, canvas_size, interpolation):
+    translate = np.array([[1, 0, strip_position[0]], [0, 1, strip_position[1]], [0, 0, 1]], dtype=np.float32)
+    transform = translate @ strip_transform
     width, height = canvas_size
     projected = cv2.warpPerspective(image, transform, (width, height), flags=interpolation)
     source_mask = np.full(image.shape[:2], 255, dtype=np.uint8)
@@ -331,15 +337,17 @@ def save_inspection_image(frame_sets, event_id, layout, event_stats):
     visible_weight = np.zeros((height, width), dtype=np.uint16)
     thermal_sum = np.zeros((height, width), dtype=np.float32)
     thermal_weight = np.zeros((height, width), dtype=np.uint16)
+    strip_origin = np.asarray(layout["strip"]["origin_in_canvas"], dtype=np.float32)
     for frame_set in frame_sets:
+        strip_position = strip_origin + frame_set["canvas_position"]
         for pair in layout["pairs"]:
             visible_source = frame_set["visible"][pair["name"]]
             visible, visible_mask = project_into_canvas(
                 undistort(
                     visible_source["frame"], pair["visible_camera_matrix"], pair["visible_distortion_coefficients"]
                 ),
-                pair["visible_to_canvas"],
-                source_offset(frame_set, visible_source["captured_at"]),
+                pair["visible_to_strip"],
+                strip_position + source_offset(frame_set, visible_source["captured_at"]) - frame_set["canvas_position"],
                 canvas_size,
                 cv2.INTER_LINEAR,
             )
@@ -350,8 +358,8 @@ def save_inspection_image(frame_sets, event_id, layout, event_stats):
                 undistort(
                     thermal_source["frame"], pair["thermal_camera_matrix"], pair["thermal_distortion_coefficients"]
                 ),
-                pair["thermal_to_canvas"],
-                source_offset(frame_set, thermal_source["captured_at"]),
+                pair["thermal_to_strip"],
+                strip_position + source_offset(frame_set, thermal_source["captured_at"]) - frame_set["canvas_position"],
                 canvas_size,
                 cv2.INTER_LINEAR,
             )
