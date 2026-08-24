@@ -44,12 +44,18 @@ The bench console has two transform workflows:
 - Once an anchored reference exists, use the relative-registration workbench to
   drag, scale, rotate, and blend a moving source over it. Saving composes the
   browser transform with the reference's canvas homography and writes the
-  target source transform.
+  target source transform. The reference frame is centered in a double-width
+  stage; place the other source beside it with only the measured overlap, not
+  directly on top of it.
 
 Map bench thermal sources to their physical pair with `pair_name` in
 `config/bench.json`. Only mapped thermal sources can be used in the drag
 workbench. The display is for fine adjustment; verify the transform with the
 calibration target and record the result before setting `calibrated: true`.
+
+The final inspection size is `inspection_roi`, not a camera frame size. Make
+the canvas and ROI wide enough for all fixed camera fields plus their overlap;
+the deployed mosaic projects every calibrated pair into that larger canvas.
 
 ## Coverage And Speed
 

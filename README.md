@@ -73,7 +73,7 @@ The main script (`app/main.py`) performs the following sequence:
 - `pairs` explicitly maps a visible camera index to a TCA9548A channel. Add a third center pair as another object; do not rely on matching indexes.
 - `visible_to_canvas` and `thermal_to_canvas` are each pair's 3x3 homographies into the shared top-down canvas.
 - `motion_to_canvas` converts phase-correlation movement from the selected motion camera into canvas pixels, including direction and scale.
-- `inspection_roi` and coverage thresholds define the required technician-review area.
+- `canvas` and `inspection_roi` define the final mosaic extent. Size them for the union of all camera fields, not one camera frame; adjacent fields should overlap only enough for calibration and blending.
 - `max_traversal_speed_mps` and `max_motion_step_pixels` reject a pass when consecutive samples cannot cover the canvas without a gap.
 
 The RCWL-0516 is presence-only; it cannot report vehicle speed. The application estimates speed from registered camera motion and records average and maximum speed in each event's metadata JSON.
