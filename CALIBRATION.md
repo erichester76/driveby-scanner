@@ -38,17 +38,11 @@ orientation, or the imaging-plane height.
 
 ## Browser Registration Workbench
 
-The bench console has two transform workflows:
-
-- Use matched points to anchor the first visible or thermal source to the
-  shared canvas. This is required because the browser has no knowledge of the
-  physical canvas position.
-- Once an anchored reference exists, use the relative-registration workbench to
-  drag, scale, rotate, and blend a moving source over it. Saving composes the
-  browser transform with the reference's canvas homography and writes the
-  target source transform. The reference frame is centered in a double-width
-  stage; place the other source beside it with only the measured overlap, not
-  directly on top of it.
+Place each source directly in the corrected multi-layer canvas. The canvas is
+the same coordinate system used by deployed capture, so dragging a layer into
+its physical position establishes its canvas anchor. Arrange camera fields
+side-by-side with the measured overlap, then use Save All to write every source
+transform together.
 
 Map bench thermal sources to their physical pair with `pair_name` in
 `config/bench.json`. Only mapped thermal sources can be used in the drag
@@ -58,7 +52,7 @@ calibration target and record the result before setting `calibrated: true`.
 The corrected multi-layer canvas uses the same `source -> canvas` transform
 contract as deployed capture. It rectifies each layer when its intrinsics are
 present, shows every configured source available in bench mode, and lets the
-operator select one layer at a time. Save All writes those selected source
+operator select one layer at a time. Save All writes directly placed source
 transforms atomically and preserves `calibrated: false`.
 
 The final inspection size is `inspection_roi`, not a camera frame size. Make

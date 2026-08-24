@@ -161,7 +161,7 @@ The corrected multi-layer canvas is the calibration view for final transforms:
 it renders all available sources in the deployed shared canvas coordinate
 system, rectifying a source when its intrinsics have been configured. Select a
 layer on the canvas to move, scale, rotate, or flip it, then use Save All to
-write all available source-to-canvas transforms atomically.
+write all directly placed source-to-canvas transforms atomically.
 
 Each bench preview has a monotonic timestamp and sequence number. They must
 advance while the page is open; if they advance while the physical scene stays
