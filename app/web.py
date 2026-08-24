@@ -50,7 +50,7 @@ function refreshLayerImage(layer){return fetch(`/api/calibration/preview/${layer
 function setupLayers(){layers=info.sources.filter(s=>s.available).map(s=>{const image=new Image();const matrix=s.matrix?normalize(s.matrix):identityFor(s);const layer={...s,id:sourceKey(s),matrix,image,opacity:.6,url:null};image.onload=renderCanvas;return layer});selectedId=layers[0]?.id||null;configureCanvas();renderLayers();renderCanvas();layers.forEach(refreshLayerImage)}
 function applyDelta(delta){const layer=selected();if(!layer)return;const [x,y]=center(layer);layer.matrix=normalize(multiply(around(x,y,delta),layer.matrix));renderCanvas()}
 function preview(kind,index){return kind==='visible'?`/api/preview/visible.jpg?source_id=${encodeURIComponent(index)}`:`/api/preview/thermal/${index}.jpg`}
-function renderRadar(radar){const e=$('radarIndicator');e.textContent=radar.enabled?(radar.detected?'Radar: vehicle detected':'Radar: clear'):'Radar: not wired';e.classList.toggle('active',Boolean(radar.detected))}
+function renderRadar(radar){const e=$('radarIndicator');e.textContent=radar.enabled?(radar.detected?`Radar: vehicle detected (GPIO ${radar.raw_value})`:`Radar: clear (GPIO ${radar.raw_value})`):'Radar: not wired';e.classList.toggle('active',Boolean(radar.detected))}
 async function status(initial=false){try{info=await api('/api/status');revision=info.revision;$('mode').textContent=info.mode;$('status').textContent=info.message;$('notice').textContent=info.calibrated?'Calibration is marked active. Review artifacts and coverage before unattended operation.':'Bench mode is safe for uncalibrated hardware. Deployed capture refuses to emit uncalibrated inspection images.';renderRadar(info.radar);if(mode==='bench'&&initial){$('feeds').innerHTML=info.visible.map(s=>feed('visible',s.source_id,s.name)).join('')+info.thermal.map((s,i)=>feed('thermal',i,s.name+' thermal',true)).join('');setupLayers();refreshPreviews()}else if(mode!=='bench')$('bench').hidden=true}catch(e){$('status').textContent=e.message}}
 async function scans(){try{const data=await api('/api/scans');$('scans').innerHTML=data.scans.length?data.scans.map(s=>`<article class="scan"><a href="/captures/${s.image}" target="_blank"><img src="/captures/${s.image}" loading="lazy"><strong>${s.event_id}</strong></a><div class="status">${s.stats}</div></article>`).join(''):'<p class="status">No deployed inspection mosaics yet.</p>'}catch(e){$('scans').textContent=e.message}}
 async function refreshPreview(image){if(image.dataset.loading)return;image.dataset.loading='1';try{const r=await fetch(preview(image.dataset.previewKind,image.dataset.previewIndex),{cache:'no-store'});if(!r.ok)throw Error(`Preview HTTP ${r.status}`);const url=URL.createObjectURL(await r.blob()),previous=image.dataset.objectUrl;image.src=url;image.dataset.objectUrl=url;if(previous)URL.revokeObjectURL(previous)}catch(e){image.alt=e.message}finally{delete image.dataset.loading}}
@@ -59,7 +59,8 @@ $('snapshot').onclick=async()=>{try{const r=await api('/api/snapshot',{method:'P
 $('mosaicCanvas').addEventListener('pointerdown',e=>{const box=e.currentTarget.getBoundingClientRect(),x=(e.clientX-box.left)/canvasScale,y=(e.clientY-box.top)/canvasScale;for(const layer of [...layers].reverse()){const inv=inverse(layer.matrix);if(!inv)continue;const [sx,sy]=apply(inv,x,y);if(sx>=0&&sy>=0&&sx<=layer.native_size[0]&&sy<=layer.native_size[1]){selectLayer(layer.id);drag={x,y};e.currentTarget.setPointerCapture(e.pointerId);break}}});$('mosaicCanvas').addEventListener('pointermove',e=>{if(!drag)return;const box=e.currentTarget.getBoundingClientRect(),x=(e.clientX-box.left)/canvasScale,y=(e.clientY-box.top)/canvasScale,layer=selected();layer.matrix=normalize(multiply(translate(x-drag.x,y-drag.y),layer.matrix));drag={x,y};renderCanvas()});for(const event of ['pointerup','pointercancel','pointerleave'])$('mosaicCanvas').addEventListener(event,()=>drag=null);
 $('alpha').oninput=()=>{const layer=selected();if(layer){layer.opacity=+$('alpha').value;renderCanvas()}};let controlScale=1,controlRotation=0;$('scale').oninput=()=>{const value=+$('scale').value;applyDelta([value/controlScale,0,0,0,value/controlScale,0,0,0,1]);controlScale=value};$('rotation').oninput=()=>{const next=+$('rotation').value,delta=(next-controlRotation)*Math.PI/180,c=Math.cos(delta),s=Math.sin(delta);applyDelta([c,-s,0,s,c,0,0,0,1]);controlRotation=next};$('flipHorizontal').onclick=()=>applyDelta([-1,0,0,0,1,0,0,0,1]);$('flipVertical').onclick=()=>applyDelta([1,0,0,0,-1,0,0,0,1]);$('resetLayer').onclick=()=>{const layer=selected();if(layer){layer.matrix=identityFor(layer);controlScale=1;controlRotation=0;$('scale').value=1;$('rotation').value=0;renderCanvas()}};
 $('saveAll').onclick=async()=>{try{const r=await api('/api/calibration/transforms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({revision,transforms:layers.map(l=>({pair:l.pair,source:l.source,matrix:l.matrix}))})});revision=r.revision;$('calibrationStatus').textContent=`Saved ${r.count} layer transforms. Layout remains uncalibrated.`}catch(e){$('calibrationStatus').textContent=e.message}};$('savePoints').onclick=async()=>{const layer=selected();if(!layer)return;try{const body=JSON.parse($('points').value);body.pair=layer.pair;body.source=layer.source;const r=await api('/api/calibration/homography',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});layer.matrix=normalize(r.transform);revision=r.revision;$('calibrationStatus').textContent=`Anchor saved. RMS reprojection error: ${r.rms.toFixed(2)} px`;renderCanvas()}catch(e){$('calibrationStatus').textContent=e.message}};
-status(true);scans();setInterval(scans,10000);setInterval(()=>{if(mode==='bench'){refreshPreviews();layers.forEach(refreshLayerImage);status(false)}},1000);
+async function refreshRadar(){if(mode!=='bench')return;try{renderRadar(await api('/api/radar'))}catch(e){$('radarIndicator').textContent='Radar: unavailable'}}
+status(true);scans();setInterval(scans,10000);setInterval(()=>{if(mode==='bench'){refreshPreviews();layers.forEach(refreshLayerImage);status(false)}},1000);setInterval(refreshRadar,150);
 </script></body></html>"""
 
 
@@ -162,10 +163,10 @@ class BenchHardware:
 
     def radar_status(self):
         if self.radar is None:
-            return {"enabled": False, "detected": False}
+            return {"enabled": False, "detected": False, "raw_value": None, "active_high": self.radar_active_high}
         with self.lock:
             value = bool(self.radar.value)
-        return {"enabled": True, "detected": value if self.radar_active_high else not value}
+        return {"enabled": True, "detected": value if self.radar_active_high else not value, "raw_value": int(value), "active_high": self.radar_active_high}
 
     def stamp(self, image, label):
         with self.lock:
@@ -360,6 +361,12 @@ def create_app(mode):
                 "radar": bench.radar_status() if bench else {"enabled": False, "detected": False},
                 "sources": available_sources(),
             })
+
+    @app.get("/api/radar")
+    def radar():
+        response = jsonify(bench.radar_status() if bench else {"enabled": False, "detected": False, "raw_value": None, "active_high": True})
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        return response
 
     @app.get("/api/preview/visible.jpg")
     def visible_preview():

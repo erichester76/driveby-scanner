@@ -16,7 +16,7 @@
     }
   ],
   "radar": {
-    "enabled": false,
+    "enabled": true,
     "bcm_pin": 17,
     "active_high": true
   },

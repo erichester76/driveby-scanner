@@ -145,7 +145,7 @@ The shipped `center` deployment pair is a USB-camera template for TCA channel
 the matching `/dev/videoX` mapping before setting the layout calibrated.
 
 To show the optional RCWL-0516 status in the bench console, wire `OUT` to BCM
-GPIO17 (physical pin 11) and set `config/bench.json` `radar.enabled` to `true`.
+GPIO17 (physical pin 11). The committed bench configuration enables this input.
 The indicator reports presence only; it does not start an inspection capture.
 
 For a direct thermal bench test outside Docker, install Blinka's Raspberry Pi
