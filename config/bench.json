@@ -1,0 +1,9 @@
+{
+  "visible_camera_indexes": [0, 1],
+  "thermal_sources": [
+    {
+      "name": "direct-thermal",
+      "kind": "direct"
+    }
+  ]
+}

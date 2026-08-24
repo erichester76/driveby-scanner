@@ -1,0 +1,29 @@
+services:
+  undercarriage:
+    build: .
+    container_name: undercarriage-inspect
+    restart: unless-stopped
+
+    # Needed for GPIO + I2C + cameras
+    privileged: true
+
+    devices:
+      - /dev/i2c-1:/dev/i2c-1
+      - /dev/gpiochip0:/dev/gpiochip0
+      - /dev/video0:/dev/video0
+      - /dev/video1:/dev/video1
+      # Add more /dev/videoX if needed
+
+    volumes:
+      - ./captures:/app/captures
+      - ./app:/app/app          # useful for live code changes during development
+      - ./config:/app/config
+      - /run/udev:/run/udev:ro
+
+    environment:
+      - PYTHONUNBUFFERED=1
+      - SCANNER_MODE=${SCANNER_MODE:-bench}
+      - SCANNER_WEB_PORT=8080
+
+    # Network not strictly required, but useful if you later add a web UI
+    network_mode: host

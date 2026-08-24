@@ -1,0 +1,3 @@
+adafruit-blinka
+adafruit-circuitpython-mlx90640
+adafruit-circuitpython-tca9548a

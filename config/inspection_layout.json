@@ -1,0 +1,49 @@
+{
+  "calibrated": false,
+  "canvas": {
+    "width": 4096,
+    "height": 8192,
+    "pixels_per_meter": 1000
+  },
+  "motion_camera_index": 0,
+  "motion_roi": [512, 512, 3072, 3072],
+  "motion_to_canvas": null,
+  "min_motion_response": 0.2,
+  "max_motion_step_pixels": 100,
+  "max_traversal_speed_mps": 0.5,
+  "capture_interval_seconds": 0.25,
+  "minimum_capture_duration_seconds": 1,
+  "maximum_capture_duration_seconds": 15,
+  "max_pair_skew_seconds": 0.35,
+  "inspection_roi": [0, 0, 4096, 8192],
+  "minimum_visible_coverage": 0.95,
+  "minimum_thermal_coverage": 0.75,
+  "minimum_visible_sharpness": 100,
+  "minimum_visible_mean": 20,
+  "maximum_visible_mean": 235,
+  "thermal_range_c": [0, 100],
+  "pairs": [
+    {
+      "name": "left",
+      "visible_camera_index": 0,
+      "thermal_tca_channel": 0,
+      "visible_camera_matrix": null,
+      "visible_distortion_coefficients": null,
+      "visible_to_canvas": null,
+      "thermal_camera_matrix": null,
+      "thermal_distortion_coefficients": null,
+      "thermal_to_canvas": null
+    },
+    {
+      "name": "right",
+      "visible_camera_index": 1,
+      "thermal_tca_channel": 1,
+      "visible_camera_matrix": null,
+      "visible_distortion_coefficients": null,
+      "visible_to_canvas": null,
+      "thermal_camera_matrix": null,
+      "thermal_distortion_coefficients": null,
+      "thermal_to_canvas": null
+    }
+  ]
+}
