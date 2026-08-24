@@ -3,6 +3,7 @@
 import json
 import os
 import threading
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -57,6 +58,7 @@ class BenchHardware:
         self.cameras = {}
         self.thermals = []
         self.config = config
+        self.preview_sequence = 0
 
     def start(self):
         import adafruit_mlx90640
@@ -97,7 +99,8 @@ class BenchHardware:
         with self.lock:
             if index not in self.cameras:
                 raise KeyError(index)
-            return cv2.cvtColor(self.cameras[index].capture_array("main"), cv2.COLOR_RGB2BGR)
+            frame = cv2.cvtColor(self.cameras[index].capture_array("main"), cv2.COLOR_RGB2BGR)
+            return self._stamp(frame, f"VISIBLE {index}")
 
     def thermal(self, source_index):
         with self.lock:
@@ -105,6 +108,26 @@ class BenchHardware:
             frame = np.zeros(24 * 32, dtype=np.float32)
             sensor.getFrame(frame)
             return source, frame.reshape(24, 32)
+
+    def stamp_thermal(self, image, name):
+        with self.lock:
+            return self._stamp(image, f"THERMAL {name}")
+
+    def _stamp(self, image, label):
+        self.preview_sequence += 1
+        timestamp = time.monotonic()
+        cv2.rectangle(image, (0, 0), (360, 40), (0, 0, 0), -1)
+        cv2.putText(
+            image,
+            f"{label}  #{self.preview_sequence}  {timestamp:.3f}",
+            (10, 27),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.55,
+            (0, 255, 255),
+            1,
+            cv2.LINE_AA,
+        )
+        return image
 
 
 def load_json(path):
@@ -117,6 +140,14 @@ def jpeg(image, quality=85):
     if not ok:
         raise RuntimeError("Could not encode preview")
     return encoded.tobytes()
+
+
+def preview_response(image):
+    response = Response(jpeg(image), mimetype="image/jpeg")
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 
 def thermal_preview(frame, thermal_range):
@@ -198,7 +229,7 @@ def create_app(mode):
         if bench is None:
             abort(503, startup_error or "Bench hardware is unavailable")
         try:
-            return Response(jpeg(cv2.resize(bench.visible(index), (960, 540))), mimetype="image/jpeg")
+            return preview_response(cv2.resize(bench.visible(index), (960, 540)))
         except KeyError:
             abort(404)
 
@@ -207,8 +238,8 @@ def create_app(mode):
         if bench is None:
             abort(503, startup_error or "Bench hardware is unavailable")
         try:
-            _source, frame = bench.thermal(index)
-            return Response(jpeg(thermal_preview(frame, layout["thermal_range_c"])), mimetype="image/jpeg")
+            source, frame = bench.thermal(index)
+            return preview_response(bench.stamp_thermal(thermal_preview(frame, layout["thermal_range_c"]), source["name"]))
         except IndexError:
             abort(404)
         except Exception as error:

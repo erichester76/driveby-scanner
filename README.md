@@ -115,6 +115,11 @@ supports point anchoring plus drag/scale/rotate relative registration, and
 lists deployed inspection mosaics. Saving a transform never enables deployed capture: it keeps
 `calibrated: false` until all calibration values are reviewed.
 
+Each bench preview has a monotonic timestamp and sequence number. They must
+advance while the page is open; if they advance while the physical scene stays
+unchanged, the browser is receiving new responses and the problem is upstream
+of browser caching.
+
 MLX90640 reads are stored as 32x24 Celsius arrays after acquisition. The
 underlying Adafruit driver requires a flat 768-value buffer, so do not pass it a
 pre-shaped 32x24 array when adding thermal capture code.
