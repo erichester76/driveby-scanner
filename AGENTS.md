@@ -5,6 +5,7 @@
 - The only application source is `app/main.py`; run it on the Raspberry Pi with `python app/main.py`. It requires live CSI cameras, GPIO, and I2C hardware, so it is not a host-only smoke test.
 - Docker starts `app.entrypoint`: `SCANNER_MODE=bench` (default) serves the browser bench/calibration console, `viewer` serves saved inspection artifacts without opening hardware, and `deployed` runs the radar capture loop. Do not run bench and deployed modes together because both open the cameras.
 - `config/bench.json` is intentionally independent of deployed calibration and supports direct or TCA9548A thermal sources for bring-up. A direct MLX90640 is valid only when it is the sole same-address sensor on the Pi I2C bus.
+- Bench mode can optionally read RCWL-0516 GPIO17 when `config/bench.json` enables its radar entry; this is status-only and must not start deployed capture.
 - The capture loop is hardware-triggered: wait for RCWL-0516 to clear -> wait for detection -> LEDs on -> capture until it clears or `maximum_capture_duration_seconds` -> LEDs off -> validate movement/coverage -> write one inspection mosaic. Keep `SIGTERM`/exception cleanup of LEDs and `Picamera2` instances reliable when changing this flow.
 - Tuning constants, BCM GPIO pins, thermal dimensions, output location, and the calibrated-mosaic flow are in `app/main.py`. Captures are written to `captures/` at the repository root.
 

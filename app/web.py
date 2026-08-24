@@ -26,7 +26,7 @@ PAGE = """<!doctype html>
 </style></head><body><main>
 <header><div><div class="mode" id="mode"></div><h1>Undercarriage Scan Console</h1></div><div class="status" id="status">Connecting...</div></header>
 <div class="notice" id="notice"></div>
-<section id="bench"><div class="controls"><button id="snapshot">Save bench snapshot</button><button class="secondary" id="toggle">Open registration workbench</button></div><div class="grid" id="feeds"></div>
+<section id="bench"><div class="controls"><div id="radarIndicator" class="status">Radar: not wired</div><button id="snapshot">Save bench snapshot</button><button class="secondary" id="toggle">Open registration workbench</button></div><div class="grid" id="feeds"></div>
 <div class="panel calibration" id="calibration"><h2>Relative registration workbench</h2><p class="help">The dashed center frame is the anchored reference. The stage is twice as wide, so place the blue moving layer to either side with only the measured overlap to create a wider stitched mosaic. Anchor one source to the shared canvas with point mapping below, then register the other source and save.</p>
 <div class="registration"><div><div class="source-row"><label>Reference pair<br><select id="referencePair"></select></label><label>Reference source<br><select id="referenceSource"><option value="visible">Visible</option><option value="thermal">Thermal</option></select></label><label>Moving target pair<br><select id="targetPair"></select></label><label>Moving source<br><select id="targetSource"><option value="visible">Visible</option><option value="thermal">Thermal</option></select></label></div><div class="stage" id="stage"><img id="referenceLayer" alt="Reference source"><img id="movingLayer" alt="Moving source"></div></div><aside><h2>Layer controls</h2><label>Blend <input id="alpha" type="range" min="0.1" max="0.9" value="0.5" step="0.05"></label><br><label>Scale <input id="scale" type="range" min="0.5" max="1.8" value="1" step="0.005"></label><br><label>Rotation <input id="rotation" type="range" min="-20" max="20" value="0" step="0.1"></label><div class="controls"><button class="secondary" id="flipHorizontal">Flip horizontal</button><button class="secondary" id="flipVertical">Flip vertical</button></div><div class="controls"><button class="secondary" id="resetTransform">Reset</button><button id="saveRelative">Save registration</button></div><div class="readout" id="transformReadout"></div><p class="help"><span class="legend-dot"></span>The moving layer is blue-tinted. Flips, scale, rotation, and translation are saved in the target calibration transform.</p></aside></div>
 <details class="legacy"><summary>Anchor a source to the shared canvas with matched points</summary><p class="help">Use this only to establish a reference transform. Enter four or more matching source and shared-canvas points.</p><label>Target pair <select id="pointPair"></select></label> <label>Source <select id="pointSource"><option value="visible">Visible</option><option value="thermal">Thermal</option></select></label><textarea id="points" placeholder='{"source_points":[[x,y],[x,y],[x,y],[x,y]],"canvas_points":[[x,y],[x,y],[x,y],[x,y]]}'></textarea><button id="savePoints">Calculate and save anchor transform</button><span class="status" id="calibrationStatus"></span></details></div></section>
@@ -37,11 +37,11 @@ const $=id=>document.querySelector('#'+id);async function api(path,options){cons
 function feed(kind,index,label,thermal=false){return `<article class="panel"><h2>${label}</h2><img class="feed ${thermal?'thermal':''}" data-preview-kind="${kind}" data-preview-index="${index}" alt="Waiting for source"></article>`}
 function options(select,values){select.innerHTML=values.map(v=>`<option value="${v.name}">${v.name}</option>`).join('')}
 function preview(kind,index){return `/api/preview/${kind}/${index}.jpg?t=${Date.now()}`}
-function pair(name){return info.pairs.find(p=>p.name===name)}function activeSource(selectPair,selectSource){const p=pair($(selectPair).value),source=$(selectSource).value;return source==='visible'?{kind:'visible',index:p.visible_camera_index}:{kind:'thermal',index:p.bench_thermal_index}}
+function pair(name){return info.pairs.find(p=>p.name===name)}function activeSource(selectPair,selectSource){const p=pair($(selectPair).value),source=$(selectSource).value;return source==='visible'?{kind:'visible',index:p.visible_camera_index}:{kind:'thermal',index:p.bench_thermal_index}}function renderRadar(radar){const indicator=$('radarIndicator');indicator.textContent=radar.enabled?(radar.detected?'Radar: vehicle detected':'Radar: clear'):'Radar: not wired';indicator.style.color=radar.detected?'#ff7169':''}
 function matrix(){const r=transform.rotation*Math.PI/180,fx=transform.flipX?-1:1,fy=transform.flipY?-1:1,c=Math.cos(r)*transform.scale,s=Math.sin(r)*transform.scale,cx=stageSize[0]/2,cy=stageSize[1]/2,a=fx*c,b=-fx*s,d=fy*s,e=fy*c;return [[a,b,transform.x+cx-a*cx-b*cy],[d,e,transform.y+cy-d*cx-e*cy],[0,0,1]]}
 function renderTransform(){const m=matrix();$('movingLayer').style.opacity=$('alpha').value;$('movingLayer').style.transform=`translate(${transform.x}px,${transform.y}px) scaleX(${transform.flipX?-1:1}) scaleY(${transform.flipY?-1:1}) scale(${transform.scale}) rotate(${transform.rotation}deg)`;$('flipHorizontal').classList.toggle('active',transform.flipX);$('flipVertical').classList.toggle('active',transform.flipY);$('transformReadout').textContent=`x: ${transform.x.toFixed(1)} px\ny: ${transform.y.toFixed(1)} px\nscale: ${transform.scale.toFixed(3)}\nrotation: ${transform.rotation.toFixed(1)} deg\nflip X: ${transform.flipX?'on':'off'}\nflip Y: ${transform.flipY?'on':'off'}\nM: ${m.flat().map(v=>v.toFixed(4)).join(', ')}`}
 function loadLayers(){try{const ref=activeSource('referencePair','referenceSource'),target=activeSource('targetPair','targetSource');if(target.index===undefined)throw Error('This thermal source is not available in bench.json');$('referenceLayer').src=preview(ref.kind,ref.index);$('movingLayer').src=preview(target.kind,target.index);renderTransform()}catch(e){$('calibrationStatus').textContent=e.message}}
-async function status(){try{info=await api('/api/status');$('mode').textContent=info.mode;$('status').textContent=info.message;$('notice').textContent=info.calibrated?'Calibration is marked active. Review artifacts and coverage before unattended operation.':'Bench mode is safe for uncalibrated hardware. Deployed capture refuses to produce inspection images until calibration is complete.';if(mode==='bench'){$('feeds').innerHTML=info.visible.map(i=>feed('visible',i,'Visible camera '+i)).join('')+info.thermal.map((s,i)=>feed('thermal',i,s.name+' thermal',true)).join('');options($('referencePair'),info.pairs);options($('targetPair'),info.pairs);options($('pointPair'),info.pairs);$('referencePair').value=info.pairs[0]?.name;$('targetPair').value=info.pairs[0]?.name;loadLayers();refreshPreviews()}else $('bench').hidden=true}catch(e){$('status').textContent=e.message}}
+async function status(){try{info=await api('/api/status');$('mode').textContent=info.mode;$('status').textContent=info.message;$('notice').textContent=info.calibrated?'Calibration is marked active. Review artifacts and coverage before unattended operation.':'Bench mode is safe for uncalibrated hardware. Deployed capture refuses to produce inspection images until calibration is complete.';renderRadar(info.radar);if(mode==='bench'){$('feeds').innerHTML=info.visible.map(i=>feed('visible',i,'Visible camera '+i)).join('')+info.thermal.map((s,i)=>feed('thermal',i,s.name+' thermal',true)).join('');options($('referencePair'),info.pairs);options($('targetPair'),info.pairs);options($('pointPair'),info.pairs);$('referencePair').value=info.pairs[0]?.name;$('targetPair').value=info.pairs[0]?.name;loadLayers();refreshPreviews()}else $('bench').hidden=true}catch(e){$('status').textContent=e.message}}
 async function scans(){try{const data=await api('/api/scans');$('scans').innerHTML=data.scans.length?data.scans.map(s=>`<article class="scan"><a href="/captures/${s.image}" target="_blank"><img src="/captures/${s.image}" loading="lazy"><strong>${s.event_id}</strong></a><div class="status">${s.stats}</div></article>`).join(''):'<p class="status">No deployed inspection mosaics yet.</p>'}catch(e){$('scans').textContent=e.message}}
 $('snapshot').onclick=async()=>{try{const r=await api('/api/snapshot',{method:'POST'});$('status').textContent='Saved '+r.event_id}catch(e){alert(e.message)}};$('toggle').onclick=()=>{$('calibration').classList.toggle('active');loadLayers()};
 for(const id of ['referencePair','referenceSource','targetPair','targetSource'])$(id).onchange=loadLayers;for(const id of ['alpha','scale','rotation'])$(id).oninput=()=>{transform.scale=+$('scale').value;transform.rotation=+$('rotation').value;renderTransform()};$('flipHorizontal').onclick=()=>{transform.flipX=!transform.flipX;renderTransform()};$('flipVertical').onclick=()=>{transform.flipY=!transform.flipY;renderTransform()};$('resetTransform').onclick=()=>{transform={x:0,y:0,scale:1,rotation:0,flipX:false,flipY:false};$('scale').value=1;$('rotation').value=0;renderTransform()};
@@ -50,7 +50,8 @@ $('saveRelative').onclick=async()=>{try{const ref=activeSource('referencePair','
 $('savePoints').onclick=async()=>{try{const body=JSON.parse($('points').value);body.pair=$('pointPair').value;body.source=$('pointSource').value;const r=await api('/api/calibration/homography',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});$('calibrationStatus').textContent='Anchor saved. RMS reprojection error: '+r.rms.toFixed(2)+' px'}catch(e){$('calibrationStatus').textContent=e.message}};
 async function refreshPreview(image){if(image.dataset.loading)return;image.dataset.loading='1';try{const response=await fetch(`/api/preview/${image.dataset.previewKind}/${image.dataset.previewIndex}.jpg`,{cache:'no-store'});if(!response.ok)throw Error(`Preview HTTP ${response.status}`);const objectUrl=URL.createObjectURL(await response.blob()),previous=image.dataset.objectUrl;image.src=objectUrl;image.dataset.objectUrl=objectUrl;if(previous)URL.revokeObjectURL(previous)}catch(error){image.alt=error.message}finally{delete image.dataset.loading}}
 function refreshPreviews(){document.querySelectorAll('.feed[data-preview-kind]').forEach(refreshPreview)}
-status();scans();setInterval(scans,10000);setInterval(()=>{if(mode==='bench')refreshPreviews()},1000);
+async function refreshRadar(){if(mode!=='bench')return;try{renderRadar((await api('/api/status')).radar)}catch(error){$('radarIndicator').textContent='Radar: unavailable'}}
+status();scans();setInterval(scans,10000);setInterval(()=>{if(mode==='bench')refreshPreviews()},1000);setInterval(refreshRadar,250);
 </script></body></html>"""
 
 
@@ -61,12 +62,15 @@ class BenchHardware:
         self.thermals = []
         self.config = config
         self.preview_sequence = 0
+        self.radar = None
+        self.radar_active_high = True
 
     def start(self):
         import adafruit_mlx90640
         import board
         import busio
         from adafruit_tca9548a import TCA9548A
+        from gpiozero import DigitalInputDevice
         from picamera2 import Picamera2
 
         try:
@@ -88,6 +92,10 @@ class BenchHardware:
                 thermal = adafruit_mlx90640.MLX90640(bus)
                 thermal.refresh_rate = adafruit_mlx90640.RefreshRate.REFRESH_4_HZ
                 self.thermals.append((source, thermal))
+            radar_config = self.config.get("radar", {})
+            if radar_config.get("enabled", False):
+                self.radar = DigitalInputDevice(radar_config.get("bcm_pin", 17), pull_up=False)
+                self.radar_active_high = radar_config.get("active_high", True)
         except Exception:
             self.close()
             raise
@@ -96,6 +104,16 @@ class BenchHardware:
         for camera in self.cameras.values():
             camera.close()
         self.cameras.clear()
+        if self.radar is not None:
+            self.radar.close()
+            self.radar = None
+
+    def radar_status(self):
+        if self.radar is None:
+            return {"enabled": False, "detected": False}
+        with self.lock:
+            detected = bool(self.radar.value)
+        return {"enabled": True, "detected": detected if self.radar_active_high else not detected}
 
     def visible(self, index):
         with self.lock:
@@ -216,6 +234,7 @@ def create_app(mode):
             "calibrated": bool(layout.get("calibrated")),
             "visible": list(bench.cameras) if bench else [],
             "thermal": [source for source, _sensor in bench.thermals] if bench else [],
+            "radar": bench.radar_status() if bench else {"enabled": False, "detected": False},
             "pairs": [
                 {
                     "name": pair["name"],

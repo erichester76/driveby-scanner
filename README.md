@@ -106,6 +106,10 @@ to the Pi I2C bus. When the TCA9548A is installed, replace the direct source in
 `config/bench.json` with one or more `"kind": "tca9548a"` sources and their
 channels.
 
+To show the optional RCWL-0516 status in the bench console, wire `OUT` to BCM
+GPIO17 (physical pin 11) and set `config/bench.json` `radar.enabled` to `true`.
+The indicator reports presence only; it does not start an inspection capture.
+
 For a direct thermal bench test outside Docker, install Blinka's Raspberry Pi
 GPIO backend with `sudo apt install -y python3-lgpio`. The Docker image already
 includes this package.

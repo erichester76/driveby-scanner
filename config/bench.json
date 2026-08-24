@@ -1,5 +1,10 @@
 {
   "visible_camera_indexes": [0, 1],
+  "radar": {
+    "enabled": false,
+    "bcm_pin": 17,
+    "active_high": true
+  },
   "thermal_sources": [
     {
       "name": "direct-thermal",
