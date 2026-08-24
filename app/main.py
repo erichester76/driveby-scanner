@@ -34,7 +34,7 @@ def load_layout():
         layout = json.load(layout_file)
 
     required = {
-        "canvas", "motion_camera_index", "motion_roi", "min_motion_response",
+        "canvas", "motion_pair_name", "motion_roi", "min_motion_response",
         "motion_to_canvas", "max_motion_step_pixels", "max_traversal_speed_mps", "max_pair_skew_seconds",
         "capture_interval_seconds", "inspection_roi", "minimum_visible_coverage", "minimum_thermal_coverage",
         "minimum_capture_duration_seconds", "maximum_capture_duration_seconds", "minimum_visible_sharpness",
@@ -69,21 +69,23 @@ def load_layout():
     layout["motion_to_canvas"] = parse_motion_transform(layout["motion_to_canvas"])
 
     names = set()
-    cameras = set()
+    visible_ids = set()
     channels = set()
     for pair in layout["pairs"]:
         for key in (
-            "name", "visible_camera_index", "thermal_tca_channel", "visible_camera_matrix",
+            "name", "visible", "thermal_tca_channel", "visible_camera_matrix",
             "visible_distortion_coefficients", "visible_to_canvas", "thermal_camera_matrix",
             "thermal_distortion_coefficients", "thermal_to_canvas",
         ):
             if key not in pair:
                 raise ValueError(f"Pair is missing required setting: {key}")
-        if pair["name"] in names or pair["visible_camera_index"] in cameras or pair["thermal_tca_channel"] in channels:
-            raise ValueError("Pair names, visible camera indexes, and thermal TCA channels must be unique")
+        visible = parse_visible_source(pair["visible"], pair["name"])
+        if pair["name"] in names or visible["id"] in visible_ids or pair["thermal_tca_channel"] in channels:
+            raise ValueError("Pair names, visible source IDs, and thermal TCA channels must be unique")
         names.add(pair["name"])
-        cameras.add(pair["visible_camera_index"])
+        visible_ids.add(visible["id"])
         channels.add(pair["thermal_tca_channel"])
+        pair["visible"] = visible
         pair["visible_camera_matrix"] = parse_camera_matrix(pair["visible_camera_matrix"], f"{pair['name']} visible_camera_matrix")
         pair["visible_distortion_coefficients"] = parse_distortion(pair["visible_distortion_coefficients"], f"{pair['name']} visible_distortion_coefficients")
         pair["visible_to_canvas"] = parse_homography(pair["visible_to_canvas"], f"{pair['name']} visible_to_canvas")
@@ -91,8 +93,8 @@ def load_layout():
         pair["thermal_distortion_coefficients"] = parse_distortion(pair["thermal_distortion_coefficients"], f"{pair['name']} thermal_distortion_coefficients")
         pair["thermal_to_canvas"] = parse_homography(pair["thermal_to_canvas"], f"{pair['name']} thermal_to_canvas")
 
-    if layout["motion_camera_index"] not in cameras:
-        raise ValueError("motion_camera_index must reference a configured visible camera")
+    if layout["motion_pair_name"] not in names:
+        raise ValueError("motion_pair_name must reference a configured pair")
     return layout
 
 
@@ -124,6 +126,27 @@ def parse_motion_transform(values):
     return matrix
 
 
+def parse_visible_source(values, pair_name):
+    if not isinstance(values, dict) or values.get("kind") not in {"picamera2", "v4l2"}:
+        raise ValueError(f"{pair_name} visible source kind must be picamera2 or v4l2")
+    size = values.get("size")
+    if not isinstance(size, list) or len(size) != 2 or any(not isinstance(value, int) or value <= 0 for value in size):
+        raise ValueError(f"{pair_name} visible source size must contain positive width and height")
+    source = {"kind": values["kind"], "size": tuple(size)}
+    if source["kind"] == "picamera2":
+        if not isinstance(values.get("index"), int) or values["index"] < 0:
+            raise ValueError(f"{pair_name} Picamera2 source requires a non-negative index")
+        source["index"] = values["index"]
+        source["id"] = f"picamera2:{values['index']}"
+    else:
+        device = values.get("device")
+        if not isinstance(device, str) or not device.startswith("/dev/"):
+            raise ValueError(f"{pair_name} V4L2 source requires an absolute /dev device path")
+        source["device"] = device
+        source["id"] = f"v4l2:{device}"
+    return source
+
+
 def setup_gpio():
     return (
         DigitalInputDevice(RADAR_PIN, pull_up=False),
@@ -134,21 +157,45 @@ def setup_gpio():
 def setup_visible_cameras(pairs):
     cameras = {}
     for pair in pairs:
-        index = pair["visible_camera_index"]
+        source = pair["visible"]
         camera = None
         try:
-            camera = Picamera2(index)
-            camera.configure(camera.create_still_configuration(main={"size": (2304, 1296), "format": "RGB888"}))
-            camera.start()
-            cameras[index] = camera
-            print(f"Visible camera {index} ({pair['name']}) ready")
+            if source["kind"] == "picamera2":
+                camera = Picamera2(source["index"])
+                camera.configure(camera.create_still_configuration(main={"size": source["size"], "format": "RGB888"}))
+                camera.start()
+            else:
+                camera = cv2.VideoCapture(source["device"], cv2.CAP_V4L2)
+                camera.set(cv2.CAP_PROP_FRAME_WIDTH, source["size"][0])
+                camera.set(cv2.CAP_PROP_FRAME_HEIGHT, source["size"][1])
+                if not camera.isOpened():
+                    raise RuntimeError(f"Could not open {source['device']}")
+            cameras[pair["name"]] = camera
+            print(f"Visible {source['kind']} source {source['id']} ({pair['name']}) ready")
         except Exception as error:
             if camera is not None:
-                camera.close()
-            for started_camera in cameras.values():
-                started_camera.close()
-            raise RuntimeError(f"Visible camera {index} failed to initialize") from error
+                close_visible_camera(source, camera)
+            for started_pair in pairs:
+                if started_pair["name"] in cameras:
+                    close_visible_camera(started_pair["visible"], cameras[started_pair["name"]])
+            raise RuntimeError(f"Visible source for {pair['name']} failed to initialize") from error
     return cameras
+
+
+def close_visible_camera(source, camera):
+    if source["kind"] == "picamera2":
+        camera.close()
+    else:
+        camera.release()
+
+
+def capture_visible_frame(source, camera):
+    if source["kind"] == "picamera2":
+        return cv2.cvtColor(camera.capture_array("main"), cv2.COLOR_RGB2BGR)
+    success, frame = camera.read()
+    if not success or frame is None:
+        raise RuntimeError(f"V4L2 capture failed for {source['device']}")
+    return frame
 
 
 def setup_thermal_cameras(pairs):
@@ -170,11 +217,11 @@ def capture_frame_set(pairs, visible_cameras, thermal_sensors):
     visible_frames = {}
     thermal_frames = {}
     for pair in pairs:
-        index = pair["visible_camera_index"]
+        source = pair["visible"]
         channel = pair["thermal_tca_channel"]
         # Capture each physical pair together to minimize vehicle-motion skew.
-        visible_frames[index] = {
-            "frame": cv2.cvtColor(visible_cameras[index].capture_array("main"), cv2.COLOR_RGB2BGR),
+        visible_frames[pair["name"]] = {
+            "frame": capture_visible_frame(source, visible_cameras[pair["name"]]),
             "captured_at": time.monotonic(),
         }
         frame = np.zeros(THERMAL_WIDTH * THERMAL_HEIGHT, dtype=np.float32)
@@ -215,15 +262,15 @@ def validate_event(frame_sets, layout):
     max_step = layout["max_motion_step_pixels"]
     max_speed = layout["max_traversal_speed_mps"]
     pixels_per_meter = layout["canvas"]["pixels_per_meter"]
-    motion_camera = layout["motion_camera_index"]
+    motion_pair = layout["motion_pair_name"]
     minimum_response = layout["min_motion_response"]
     speeds = []
     for frame_set in frame_sets:
         for pair in layout["pairs"]:
-            valid, reason = visible_frame_is_valid(frame_set["visible"][pair["visible_camera_index"]]["frame"], layout)
+            valid, reason = visible_frame_is_valid(frame_set["visible"][pair["name"]]["frame"], layout)
             if not valid:
                 raise CaptureRejected(f"{pair['name']} {reason}")
-            visible_at = frame_set["visible"][pair["visible_camera_index"]]["captured_at"]
+            visible_at = frame_set["visible"][pair["name"]]["captured_at"]
             thermal_at = frame_set["thermal"][pair["thermal_tca_channel"]]["captured_at"]
             if abs(thermal_at - visible_at) > layout["max_pair_skew_seconds"]:
                 raise CaptureRejected(f"{pair['name']} visible/thermal skew exceeds max_pair_skew_seconds")
@@ -240,7 +287,7 @@ def validate_event(frame_sets, layout):
             raise CaptureRejected(f"motion registration confidence too low ({response:.3f})")
         if np.hypot(dx, dy) > max_step or speed > max_speed:
             raise CaptureRejected(f"vehicle moved too far between samples ({speed:.2f} m/s)")
-        if current["visible"][motion_camera]["frame"].shape != previous["visible"][motion_camera]["frame"].shape:
+        if current["visible"][motion_pair]["frame"].shape != previous["visible"][motion_pair]["frame"].shape:
             raise CaptureRejected("motion camera frame shape changed during capture")
     return {
         "frame_sets": len(frame_sets),
@@ -286,7 +333,7 @@ def save_inspection_image(frame_sets, event_id, layout, event_stats):
     thermal_weight = np.zeros((height, width), dtype=np.uint16)
     for frame_set in frame_sets:
         for pair in layout["pairs"]:
-            visible_source = frame_set["visible"][pair["visible_camera_index"]]
+            visible_source = frame_set["visible"][pair["name"]]
             visible, visible_mask = project_into_canvas(
                 undistort(
                     visible_source["frame"], pair["visible_camera_matrix"], pair["visible_distortion_coefficients"]
@@ -378,15 +425,13 @@ def capture_event(radar, led, visible_cameras, thermal_sensors, layout):
         while time.monotonic() < deadline:
             captured_at = time.monotonic()
             visible, thermal = capture_frame_set(layout["pairs"], visible_cameras, thermal_sensors)
-            motion_pair = next(
-                pair for pair in layout["pairs"] if pair["visible_camera_index"] == layout["motion_camera_index"]
-            )
+            motion_pair = next(pair for pair in layout["pairs"] if pair["name"] == layout["motion_pair_name"])
             motion_frame = undistort(
-                visible[layout["motion_camera_index"]]["frame"],
+                visible[motion_pair["name"]]["frame"],
                 motion_pair["visible_camera_matrix"],
                 motion_pair["visible_distortion_coefficients"],
             )
-            motion_captured_at = visible[layout["motion_camera_index"]]["captured_at"]
+            motion_captured_at = visible[motion_pair["name"]]["captured_at"]
             motion = np.zeros(2, dtype=np.float32)
             response = 1.0
             if previous_motion_frame is not None:
@@ -460,8 +505,9 @@ def main():
         if led is not None:
             led.off()
             led.close()
-        for camera in visible_cameras.values():
-            camera.close()
+        for pair in layout["pairs"] if "layout" in locals() else []:
+            if pair["name"] in visible_cameras:
+                close_visible_camera(pair["visible"], visible_cameras[pair["name"]])
         if radar is not None:
             radar.close()
         print("Done.")

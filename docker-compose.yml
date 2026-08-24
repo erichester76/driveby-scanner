@@ -12,7 +12,7 @@ services:
       - /dev/gpiochip0:/dev/gpiochip0
       - /dev/video0:/dev/video0
       - /dev/video1:/dev/video1
-      # Add more /dev/videoX if needed
+      # Add the resolved /dev/videoX device when a V4L2/USB visible source is configured.
 
     volumes:
       - ./captures:/app/captures

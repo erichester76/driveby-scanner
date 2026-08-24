@@ -106,6 +106,44 @@ to the Pi I2C bus. When the TCA9548A is installed, replace the direct source in
 `config/bench.json` with one or more `"kind": "tca9548a"` sources and their
 channels.
 
+The committed bench configuration is the multiplexer setup: left, right, and
+center thermal sources use TCA9548A channels `0`, `1`, and `2`. Do not use it
+for the earlier single direct-connected MLX90640 test without changing the
+thermal source back to `"kind": "direct"`.
+
+Both `visible_sources` and `thermal_sources` in `config/bench.json` are named
+and explicitly mapped to their `Picamera2` indexes or TCA9548A channels. A
+thermal source with no matching deployed `pairs` entry can be previewed, but it
+cannot be registered or included in a deployed mosaic until its matching
+visible-camera pair is added to `config/inspection_layout.json`.
+
+Visible sources support either CSI/HAT-managed cameras or USB UVC cameras:
+
+```json
+{
+  "kind": "picamera2",
+  "index": 0,
+  "size": [2304, 1296]
+}
+```
+
+```json
+{
+  "kind": "v4l2",
+  "device": "/dev/v4l/by-id/usb-your-camera-video-index0",
+  "size": [1920, 1080]
+}
+```
+
+Use the stable `/dev/v4l/by-id/...` path in configuration. Docker must also
+pass through the corresponding resolved `/dev/videoX` device in
+`docker-compose.yml`. Use `v4l2-ctl --list-devices` and `ls -l
+/dev/v4l/by-id/` on the Pi to identify both paths.
+
+The shipped `center` deployment pair is a USB-camera template for TCA channel
+`2`. Replace its `device` value with the discovered stable by-id path and add
+the matching `/dev/videoX` mapping before setting the layout calibrated.
+
 To show the optional RCWL-0516 status in the bench console, wire `OUT` to BCM
 GPIO17 (physical pin 11) and set `config/bench.json` `radar.enabled` to `true`.
 The indicator reports presence only; it does not start an inspection capture.
@@ -118,6 +156,12 @@ The console provides live visible and thermal previews, saves bench snapshots,
 supports point anchoring plus drag/scale/rotate relative registration, and
 lists deployed inspection mosaics. Saving a transform never enables deployed capture: it keeps
 `calibrated: false` until all calibration values are reviewed.
+
+The corrected multi-layer canvas is the calibration view for final transforms:
+it renders all available sources in the deployed shared canvas coordinate
+system, rectifying a source when its intrinsics have been configured. Select a
+layer on the canvas to move, scale, rotate, or flip it, then use Save All to
+write all available source-to-canvas transforms atomically.
 
 Each bench preview has a monotonic timestamp and sequence number. They must
 advance while the page is open; if they advance while the physical scene stays

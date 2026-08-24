@@ -1,5 +1,20 @@
 {
-  "visible_camera_indexes": [0, 1],
+  "visible_sources": [
+    {
+      "name": "left-visible",
+      "pair_name": "left",
+      "kind": "picamera2",
+      "index": 0,
+      "size": [2304, 1296]
+    },
+    {
+      "name": "right-visible",
+      "pair_name": "right",
+      "kind": "picamera2",
+      "index": 1,
+      "size": [2304, 1296]
+    }
+  ],
   "radar": {
     "enabled": false,
     "bcm_pin": 17,
@@ -7,9 +22,22 @@
   },
   "thermal_sources": [
     {
-      "name": "direct-thermal",
+      "name": "left-thermal",
       "pair_name": "left",
-      "kind": "direct"
+      "kind": "tca9548a",
+      "channel": 0
+    },
+    {
+      "name": "right-thermal",
+      "pair_name": "right",
+      "kind": "tca9548a",
+      "channel": 1
+    },
+    {
+      "name": "center-thermal",
+      "pair_name": "center",
+      "kind": "tca9548a",
+      "channel": 2
     }
   ]
 }

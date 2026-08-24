@@ -5,7 +5,7 @@
     "height": 8192,
     "pixels_per_meter": 1000
   },
-  "motion_camera_index": 0,
+  "motion_pair_name": "left",
   "motion_roi": [512, 512, 3072, 3072],
   "motion_to_canvas": null,
   "min_motion_response": 0.2,
@@ -25,7 +25,11 @@
   "pairs": [
     {
       "name": "left",
-      "visible_camera_index": 0,
+      "visible": {
+        "kind": "picamera2",
+        "index": 0,
+        "size": [2304, 1296]
+      },
       "thermal_tca_channel": 0,
       "visible_camera_matrix": null,
       "visible_distortion_coefficients": null,
@@ -36,8 +40,27 @@
     },
     {
       "name": "right",
-      "visible_camera_index": 1,
+      "visible": {
+        "kind": "picamera2",
+        "index": 1,
+        "size": [2304, 1296]
+      },
       "thermal_tca_channel": 1,
+      "visible_camera_matrix": null,
+      "visible_distortion_coefficients": null,
+      "visible_to_canvas": null,
+      "thermal_camera_matrix": null,
+      "thermal_distortion_coefficients": null,
+      "thermal_to_canvas": null
+    },
+    {
+      "name": "center",
+      "visible": {
+        "kind": "v4l2",
+        "device": "/dev/v4l/by-id/REPLACE_WITH_CENTER_CAMERA",
+        "size": [1920, 1080]
+      },
+      "thermal_tca_channel": 2,
       "visible_camera_matrix": null,
       "visible_distortion_coefficients": null,
       "visible_to_canvas": null,

@@ -1,5 +1,7 @@
 """Browser bench, calibration, and inspection-artifact viewer for the scanner."""
 
+import copy
+import hashlib
 import json
 import os
 import threading
@@ -20,38 +22,44 @@ CAPTURE_DIR.mkdir(exist_ok=True)
 PAGE = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Drive-Over Scanner</title><style>
-:root{color-scheme:dark;--bg:#101413;--panel:#18201e;--line:#31403b;--ink:#e8eee8;--muted:#a6b3aa;--accent:#d6f27d;--warning:#ffca68;--blue:#8bd5ff}
-*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top,#22322c,var(--bg) 42rem);color:var(--ink);font:15px/1.45 system-ui,sans-serif}main{max-width:1440px;margin:auto;padding:28px}h1{font-size:clamp(1.7rem,4vw,3rem);margin:0}h2{font-size:1rem;text-transform:uppercase;letter-spacing:.09em;color:var(--muted)}header{display:flex;justify-content:space-between;gap:16px;align-items:end;border-bottom:1px solid var(--line);padding-bottom:20px}.mode{color:var(--accent);font-weight:700;text-transform:uppercase;letter-spacing:.12em}.notice{margin:18px 0;padding:12px 14px;background:#25251a;border-left:3px solid var(--warning);color:#f9e7bb}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:16px}.panel{background:color-mix(in srgb,var(--panel),transparent 7%);border:1px solid var(--line);padding:16px;border-radius:8px}.feed{width:100%;aspect-ratio:16/9;object-fit:contain;background:#090c0b;border:1px solid #27332f}.thermal{image-rendering:pixelated}.controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:18px 0}button{border:0;border-radius:4px;background:var(--accent);color:#152014;padding:11px 15px;font-weight:750;cursor:pointer}button.secondary{background:#2a3933;color:var(--ink)}button.secondary.active{background:var(--blue);color:#10212b}button:disabled{opacity:.45;cursor:not-allowed}.status{color:var(--muted)}.scans{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px}.scan{border:1px solid var(--line);padding:10px;border-radius:7px}.scan img{width:100%;background:#090c0b}.scan a{color:var(--accent);text-decoration:none}.calibration{display:none}.calibration.active{display:block}textarea{width:100%;min-height:125px;background:#0c100f;color:var(--ink);border:1px solid var(--line);padding:10px;font:12px ui-monospace,monospace}select,input{background:#0c100f;color:var(--ink);border:1px solid var(--line);padding:7px}.registration{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:16px}.stage{position:relative;width:100%;aspect-ratio:16/9;background:#070908;border:1px solid var(--line);overflow:hidden;touch-action:none}.stage img{position:absolute;width:100%;height:100%;object-fit:fill;user-select:none;-webkit-user-drag:none}.stage #movingLayer{opacity:.5;cursor:grab;transform-origin:50% 50%;filter:saturate(1.25)}.stage #movingLayer.dragging{cursor:grabbing}.readout{font:12px ui-monospace,monospace;color:var(--blue);white-space:pre-wrap}.help{color:var(--muted);margin-top:0}.source-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}.legacy{margin-top:20px}.legend-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--blue);margin-right:5px}@media(max-width:750px){main{padding:16px}header{align-items:start;flex-direction:column}.registration{grid-template-columns:1fr}.source-row{grid-template-columns:1fr}}
-.stage{aspect-ratio:32/9}.stage #referenceLayer,.stage #movingLayer{left:25%;width:50%}.stage::after{content:"";position:absolute;left:25%;width:50%;height:100%;border:1px dashed rgba(214,242,125,.7);pointer-events:none}
+:root{color-scheme:dark;--bg:#101413;--panel:#18201e;--line:#31403b;--ink:#e8eee8;--muted:#a6b3aa;--accent:#d6f27d;--blue:#8bd5ff;--alert:#ff7169}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top,#22322c,var(--bg) 42rem);color:var(--ink);font:15px/1.45 system-ui,sans-serif}main{max-width:1440px;margin:auto;padding:28px}h1{font-size:clamp(1.7rem,4vw,3rem);margin:0}h2{font-size:.9rem;text-transform:uppercase;letter-spacing:.09em;color:var(--muted)}header{display:flex;justify-content:space-between;gap:16px;align-items:end;border-bottom:1px solid var(--line);padding-bottom:20px}.mode{color:var(--accent);font-weight:700;text-transform:uppercase;letter-spacing:.12em}.notice{margin:18px 0;padding:12px 14px;background:#25251a;border-left:3px solid #ffca68;color:#f9e7bb}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:16px}.panel{background:color-mix(in srgb,var(--panel),transparent 7%);border:1px solid var(--line);padding:16px;border-radius:8px}.feed{width:100%;aspect-ratio:16/9;object-fit:contain;background:#090c0b;border:1px solid #27332f}.thermal{image-rendering:pixelated}.controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:18px 0}button{border:0;border-radius:4px;background:var(--accent);color:#152014;padding:10px 14px;font-weight:750;cursor:pointer}button.secondary{background:#2a3933;color:var(--ink)}button.secondary.active,.layer.active{background:var(--blue);color:#10212b}button:disabled{opacity:.45;cursor:not-allowed}.status{color:var(--muted)}.radar{border:1px solid var(--line);padding:8px 10px;border-radius:4px}.radar.active{border-color:var(--alert);color:var(--alert)}.scans{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px}.scan{border:1px solid var(--line);padding:10px;border-radius:7px}.scan img{width:100%;background:#090c0b}.scan a{color:var(--accent);text-decoration:none}.calibration{display:none}.calibration.active{display:block}select,input,textarea{background:#0c100f;color:var(--ink);border:1px solid var(--line);padding:7px}textarea{width:100%;min-height:120px;font:12px ui-monospace,monospace}.workspace{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:16px}.canvas-wrap{background:#070908;border:1px solid var(--line);overflow:auto;max-height:70vh}.canvas-wrap canvas{display:block;margin:auto;touch-action:none;cursor:crosshair}.layers{display:flex;flex-wrap:wrap;gap:7px;margin:0 0 12px}.layer{background:#27332f;color:var(--ink);border:1px solid var(--line);padding:6px 8px;font-size:.78rem}.readout{font:12px ui-monospace,monospace;color:var(--blue);white-space:pre-wrap}.help{color:var(--muted)}.controls label{display:grid;gap:4px;font-size:.85rem}@media(max-width:750px){main{padding:16px}header{align-items:start;flex-direction:column}.workspace{grid-template-columns:1fr}}
 </style></head><body><main>
 <header><div><div class="mode" id="mode"></div><h1>Undercarriage Scan Console</h1></div><div class="status" id="status">Connecting...</div></header>
 <div class="notice" id="notice"></div>
-<section id="bench"><div class="controls"><div id="radarIndicator" class="status">Radar: not wired</div><button id="snapshot">Save bench snapshot</button><button class="secondary" id="toggle">Open registration workbench</button></div><div class="grid" id="feeds"></div>
-<div class="panel calibration" id="calibration"><h2>Relative registration workbench</h2><p class="help">The dashed center frame is the anchored reference. The stage is twice as wide, so place the blue moving layer to either side with only the measured overlap to create a wider stitched mosaic. Anchor one source to the shared canvas with point mapping below, then register the other source and save.</p>
-<div class="registration"><div><div class="source-row"><label>Reference pair<br><select id="referencePair"></select></label><label>Reference source<br><select id="referenceSource"><option value="visible">Visible</option><option value="thermal">Thermal</option></select></label><label>Moving target pair<br><select id="targetPair"></select></label><label>Moving source<br><select id="targetSource"><option value="visible">Visible</option><option value="thermal">Thermal</option></select></label></div><div class="stage" id="stage"><img id="referenceLayer" alt="Reference source"><img id="movingLayer" alt="Moving source"></div></div><aside><h2>Layer controls</h2><label>Blend <input id="alpha" type="range" min="0.1" max="0.9" value="0.5" step="0.05"></label><br><label>Scale <input id="scale" type="range" min="0.5" max="1.8" value="1" step="0.005"></label><br><label>Rotation <input id="rotation" type="range" min="-20" max="20" value="0" step="0.1"></label><div class="controls"><button class="secondary" id="flipHorizontal">Flip horizontal</button><button class="secondary" id="flipVertical">Flip vertical</button></div><div class="controls"><button class="secondary" id="resetTransform">Reset</button><button id="saveRelative">Save registration</button></div><div class="readout" id="transformReadout"></div><p class="help"><span class="legend-dot"></span>The moving layer is blue-tinted. Flips, scale, rotation, and translation are saved in the target calibration transform.</p></aside></div>
-<details class="legacy"><summary>Anchor a source to the shared canvas with matched points</summary><p class="help">Use this only to establish a reference transform. Enter four or more matching source and shared-canvas points.</p><label>Target pair <select id="pointPair"></select></label> <label>Source <select id="pointSource"><option value="visible">Visible</option><option value="thermal">Thermal</option></select></label><textarea id="points" placeholder='{"source_points":[[x,y],[x,y],[x,y],[x,y]],"canvas_points":[[x,y],[x,y],[x,y],[x,y]]}'></textarea><button id="savePoints">Calculate and save anchor transform</button><span class="status" id="calibrationStatus"></span></details></div></section>
+<section id="bench"><div class="controls"><div class="radar" id="radarIndicator">Radar: not wired</div><button id="snapshot">Save bench snapshot</button><button class="secondary" id="toggle">Open corrected layer canvas</button></div><div class="grid" id="feeds"></div>
+<div class="panel calibration" id="calibration"><h2>Corrected multi-layer canvas</h2><p class="help">Every available source is rectified with its configured lens calibration before rendering. Click a source directly in the canvas or select its layer pill; drag to move only that layer. The shared canvas has the same coordinate system as deployed capture. Save All writes every available layer transform atomically but does not mark the layout calibrated.</p><div class="workspace"><div><div class="layers" id="layers"></div><div class="canvas-wrap"><canvas id="mosaicCanvas"></canvas></div></div><aside><h2 id="selectedTitle">Select a layer</h2><div class="controls"><label>Opacity <input id="alpha" type="range" min="0.1" max="1" value="0.6" step="0.05"></label><label>Scale <input id="scale" type="range" min="0.5" max="1.8" value="1" step="0.005"></label><label>Rotation <input id="rotation" type="range" min="-30" max="30" value="0" step="0.1"></label></div><div class="controls"><button class="secondary" id="flipHorizontal">Flip horizontal</button><button class="secondary" id="flipVertical">Flip vertical</button></div><div class="controls"><button class="secondary" id="resetLayer">Reset layer</button><button id="saveAll">Save all layers</button></div><div class="readout" id="transformReadout"></div><p class="help">A source marked <code>raw</code> has no lens coefficients yet. Use point anchoring to establish the first layer's position, then refine all layers here.</p></aside></div><details><summary>Anchor selected layer with matched points</summary><p class="help">Use four or more corresponding corrected-source and shared-canvas points to establish an initial transform.</p><textarea id="points" placeholder='{"source_points":[[x,y],[x,y],[x,y],[x,y]],"canvas_points":[[x,y],[x,y],[x,y],[x,y]]}'></textarea><button id="savePoints">Calculate and save selected anchor</button><span class="status" id="calibrationStatus"></span></details></div></section>
 <section><h2>Technician inspections</h2><div class="scans" id="scans"></div></section>
 </main><script>
-const mode={{ mode|tojson }}, stageSize=[1920,540];let info={},drag=null,transform={x:0,y:0,scale:1,rotation:0,flipX:false,flipY:false};
-const $=id=>document.querySelector('#'+id);async function api(path,options){const r=await fetch(path,options);const data=await r.json();if(!r.ok)throw Error(data.error||r.statusText);return data}
+const mode={{ mode|tojson }};let info={},layers=[],selectedId=null,drag=null,canvasScale=1,revision=null;
+const $=id=>document.querySelector('#'+id);const sourceKey=s=>`${s.pair}:${s.source}`;
+async function api(path,options){const r=await fetch(path,options);const data=await r.json();if(!r.ok)throw Error(data.error||r.statusText);return data}
 function feed(kind,index,label,thermal=false){return `<article class="panel"><h2>${label}</h2><img class="feed ${thermal?'thermal':''}" data-preview-kind="${kind}" data-preview-index="${index}" alt="Waiting for source"></article>`}
-function options(select,values){select.innerHTML=values.map(v=>`<option value="${v.name}">${v.name}</option>`).join('')}
-function preview(kind,index){return `/api/preview/${kind}/${index}.jpg?t=${Date.now()}`}
-function pair(name){return info.pairs.find(p=>p.name===name)}function activeSource(selectPair,selectSource){const p=pair($(selectPair).value),source=$(selectSource).value;return source==='visible'?{kind:'visible',index:p.visible_camera_index}:{kind:'thermal',index:p.bench_thermal_index}}function renderRadar(radar){const indicator=$('radarIndicator');indicator.textContent=radar.enabled?(radar.detected?'Radar: vehicle detected':'Radar: clear'):'Radar: not wired';indicator.style.color=radar.detected?'#ff7169':''}
-function matrix(){const r=transform.rotation*Math.PI/180,fx=transform.flipX?-1:1,fy=transform.flipY?-1:1,c=Math.cos(r)*transform.scale,s=Math.sin(r)*transform.scale,cx=stageSize[0]/2,cy=stageSize[1]/2,a=fx*c,b=-fx*s,d=fy*s,e=fy*c;return [[a,b,transform.x+cx-a*cx-b*cy],[d,e,transform.y+cy-d*cx-e*cy],[0,0,1]]}
-function renderTransform(){const m=matrix();$('movingLayer').style.opacity=$('alpha').value;$('movingLayer').style.transform=`translate(${transform.x}px,${transform.y}px) scaleX(${transform.flipX?-1:1}) scaleY(${transform.flipY?-1:1}) scale(${transform.scale}) rotate(${transform.rotation}deg)`;$('flipHorizontal').classList.toggle('active',transform.flipX);$('flipVertical').classList.toggle('active',transform.flipY);$('transformReadout').textContent=`x: ${transform.x.toFixed(1)} px\ny: ${transform.y.toFixed(1)} px\nscale: ${transform.scale.toFixed(3)}\nrotation: ${transform.rotation.toFixed(1)} deg\nflip X: ${transform.flipX?'on':'off'}\nflip Y: ${transform.flipY?'on':'off'}\nM: ${m.flat().map(v=>v.toFixed(4)).join(', ')}`}
-function loadLayers(){try{const ref=activeSource('referencePair','referenceSource'),target=activeSource('targetPair','targetSource');if(target.index===undefined)throw Error('This thermal source is not available in bench.json');$('referenceLayer').src=preview(ref.kind,ref.index);$('movingLayer').src=preview(target.kind,target.index);renderTransform()}catch(e){$('calibrationStatus').textContent=e.message}}
-async function status(){try{info=await api('/api/status');$('mode').textContent=info.mode;$('status').textContent=info.message;$('notice').textContent=info.calibrated?'Calibration is marked active. Review artifacts and coverage before unattended operation.':'Bench mode is safe for uncalibrated hardware. Deployed capture refuses to produce inspection images until calibration is complete.';renderRadar(info.radar);if(mode==='bench'){$('feeds').innerHTML=info.visible.map(i=>feed('visible',i,'Visible camera '+i)).join('')+info.thermal.map((s,i)=>feed('thermal',i,s.name+' thermal',true)).join('');options($('referencePair'),info.pairs);options($('targetPair'),info.pairs);options($('pointPair'),info.pairs);$('referencePair').value=info.pairs[0]?.name;$('targetPair').value=info.pairs[0]?.name;loadLayers();refreshPreviews()}else $('bench').hidden=true}catch(e){$('status').textContent=e.message}}
+function identityFor(source){const [w,h]=source.native_size,c=info.canvas,scale=Math.min(c.width/w,c.height/h)*.45;return [scale,0,(c.width-w*scale)/2,0,scale,(c.height-h*scale)/2,0,0,1]}
+function normalize(matrix){const z=matrix[8]||1;return matrix.map(v=>v/z)}
+function multiply(a,b){const out=Array(9).fill(0);for(let row=0;row<3;row++)for(let col=0;col<3;col++)for(let k=0;k<3;k++)out[row*3+col]+=a[row*3+k]*b[k*3+col];return out}
+function translate(x,y){return [1,0,x,0,1,y,0,0,1]}function around(x,y,delta){return multiply(translate(x,y),multiply(delta,translate(-x,-y)))}
+function apply(matrix,x,y){const z=matrix[6]*x+matrix[7]*y+matrix[8];return [(matrix[0]*x+matrix[1]*y+matrix[2])/z,(matrix[3]*x+matrix[4]*y+matrix[5])/z]}
+function inverse(m){const [a,b,c,d,e,f,g,h,i]=m,det=a*(e*i-f*h)-b*(d*i-f*g)+c*(d*h-e*g);if(Math.abs(det)<1e-9)return null;return [(e*i-f*h)/det,(c*h-b*i)/det,(b*f-c*e)/det,(f*g-d*i)/det,(a*i-c*g)/det,(c*d-a*f)/det,(d*h-e*g)/det,(b*g-a*h)/det,(a*e-b*d)/det]}
+function selected(){return layers.find(l=>l.id===selectedId)}function center(layer){return apply(layer.matrix,layer.native_size[0]/2,layer.native_size[1]/2)}
+function renderLayers(){const list=$('layers');list.innerHTML=layers.map(l=>`<button class="layer ${l.id===selectedId?'active':''}" data-layer="${l.id}">${l.name} ${l.rectified?'':'(raw)'}</button>`).join('');list.querySelectorAll('[data-layer]').forEach(b=>b.onclick=()=>selectLayer(b.dataset.layer))}
+function configureCanvas(){const c=$('mosaicCanvas'),maxW=1200,maxH=820,scale=Math.min(maxW/info.canvas.width,maxH/info.canvas.height);canvasScale=scale;c.width=Math.max(1,Math.round(info.canvas.width*scale));c.height=Math.max(1,Math.round(info.canvas.height*scale));c.style.width=c.width+'px';c.style.height=c.height+'px'}
+function renderCanvas(){const canvas=$('mosaicCanvas'),ctx=canvas.getContext('2d');ctx.fillStyle='#070908';ctx.fillRect(0,0,canvas.width,canvas.height);for(const layer of layers){if(!layer.image.complete)continue;const m=layer.matrix,s=canvasScale;ctx.save();ctx.globalAlpha=layer.id===selectedId?1:layer.opacity;ctx.setTransform(s*m[0],s*m[3],s*m[1],s*m[4],s*m[2],s*m[5]);ctx.drawImage(layer.image,0,0,layer.native_size[0],layer.native_size[1]);if(layer.id===selectedId){ctx.strokeStyle='#d6f27d';ctx.lineWidth=2/s;ctx.strokeRect(0,0,layer.native_size[0],layer.native_size[1])}ctx.restore()}const layer=selected();$('selectedTitle').textContent=layer?layer.name:'Select a layer';if(layer){const m=layer.matrix;$('transformReadout').textContent=`source: ${layer.id}\nrectified: ${layer.rectified?'yes':'no'}\nmatrix:\n${m.slice(0,3).map(v=>v.toFixed(4)).join('  ')}\n${m.slice(3,6).map(v=>v.toFixed(4)).join('  ')}\n${m.slice(6,9).map(v=>v.toFixed(4)).join('  ')}`}else $('transformReadout').textContent=''}
+function selectLayer(id){selectedId=id;const layer=selected();$('alpha').value=layer.opacity;$('scale').value=1;$('rotation').value=0;renderLayers();renderCanvas()}
+function refreshLayerImage(layer){return fetch(`/api/calibration/preview/${layer.pair}/${layer.source}.jpg`,{cache:'no-store'}).then(r=>{if(!r.ok)throw Error('Preview HTTP '+r.status);return r.blob()}).then(blob=>{if(layer.url)URL.revokeObjectURL(layer.url);layer.url=URL.createObjectURL(blob);layer.image.src=layer.url}).catch(error=>{$('calibrationStatus').textContent=`${layer.name}: ${error.message}`})}
+function setupLayers(){layers=info.sources.filter(s=>s.available).map(s=>{const image=new Image();const matrix=s.matrix?normalize(s.matrix):identityFor(s);const layer={...s,id:sourceKey(s),matrix,image,opacity:.6,url:null};image.onload=renderCanvas;return layer});selectedId=layers[0]?.id||null;configureCanvas();renderLayers();renderCanvas();layers.forEach(refreshLayerImage)}
+function applyDelta(delta){const layer=selected();if(!layer)return;const [x,y]=center(layer);layer.matrix=normalize(multiply(around(x,y,delta),layer.matrix));renderCanvas()}
+function preview(kind,index){return kind==='visible'?`/api/preview/visible.jpg?source_id=${encodeURIComponent(index)}`:`/api/preview/thermal/${index}.jpg`}
+function renderRadar(radar){const e=$('radarIndicator');e.textContent=radar.enabled?(radar.detected?'Radar: vehicle detected':'Radar: clear'):'Radar: not wired';e.classList.toggle('active',Boolean(radar.detected))}
+async function status(initial=false){try{info=await api('/api/status');revision=info.revision;$('mode').textContent=info.mode;$('status').textContent=info.message;$('notice').textContent=info.calibrated?'Calibration is marked active. Review artifacts and coverage before unattended operation.':'Bench mode is safe for uncalibrated hardware. Deployed capture refuses to emit uncalibrated inspection images.';renderRadar(info.radar);if(mode==='bench'&&initial){$('feeds').innerHTML=info.visible.map(s=>feed('visible',s.source_id,s.name)).join('')+info.thermal.map((s,i)=>feed('thermal',i,s.name+' thermal',true)).join('');setupLayers();refreshPreviews()}else if(mode!=='bench')$('bench').hidden=true}catch(e){$('status').textContent=e.message}}
 async function scans(){try{const data=await api('/api/scans');$('scans').innerHTML=data.scans.length?data.scans.map(s=>`<article class="scan"><a href="/captures/${s.image}" target="_blank"><img src="/captures/${s.image}" loading="lazy"><strong>${s.event_id}</strong></a><div class="status">${s.stats}</div></article>`).join(''):'<p class="status">No deployed inspection mosaics yet.</p>'}catch(e){$('scans').textContent=e.message}}
-$('snapshot').onclick=async()=>{try{const r=await api('/api/snapshot',{method:'POST'});$('status').textContent='Saved '+r.event_id}catch(e){alert(e.message)}};$('toggle').onclick=()=>{$('calibration').classList.toggle('active');loadLayers()};
-for(const id of ['referencePair','referenceSource','targetPair','targetSource'])$(id).onchange=loadLayers;for(const id of ['alpha','scale','rotation'])$(id).oninput=()=>{transform.scale=+$('scale').value;transform.rotation=+$('rotation').value;renderTransform()};$('flipHorizontal').onclick=()=>{transform.flipX=!transform.flipX;renderTransform()};$('flipVertical').onclick=()=>{transform.flipY=!transform.flipY;renderTransform()};$('resetTransform').onclick=()=>{transform={x:0,y:0,scale:1,rotation:0,flipX:false,flipY:false};$('scale').value=1;$('rotation').value=0;renderTransform()};
-$('stage').addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,startX:transform.x,startY:transform.y};$('movingLayer').classList.add('dragging');e.target.setPointerCapture?.(e.pointerId)});$('stage').addEventListener('pointermove',e=>{if(!drag)return;const box=$('stage').getBoundingClientRect();transform.x=drag.startX+(e.clientX-drag.x)*stageSize[0]/box.width;transform.y=drag.startY+(e.clientY-drag.y)*stageSize[1]/box.height;renderTransform()});for(const event of ['pointerup','pointercancel','pointerleave'])$('stage').addEventListener(event,()=>{drag=null;$('movingLayer').classList.remove('dragging')});
-$('saveRelative').onclick=async()=>{try{const ref=activeSource('referencePair','referenceSource'),target=activeSource('targetPair','targetSource');const result=await api('/api/calibration/relative',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reference_pair:$('referencePair').value,reference_source:ref.kind,target_pair:$('targetPair').value,target_source:target.kind,stage_transform:matrix(),stage_size:stageSize})});$('calibrationStatus').textContent=`Saved ${result.target_key}; reference composition complete.`}catch(e){$('calibrationStatus').textContent=e.message}};
-$('savePoints').onclick=async()=>{try{const body=JSON.parse($('points').value);body.pair=$('pointPair').value;body.source=$('pointSource').value;const r=await api('/api/calibration/homography',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});$('calibrationStatus').textContent='Anchor saved. RMS reprojection error: '+r.rms.toFixed(2)+' px'}catch(e){$('calibrationStatus').textContent=e.message}};
-async function refreshPreview(image){if(image.dataset.loading)return;image.dataset.loading='1';try{const response=await fetch(`/api/preview/${image.dataset.previewKind}/${image.dataset.previewIndex}.jpg`,{cache:'no-store'});if(!response.ok)throw Error(`Preview HTTP ${response.status}`);const objectUrl=URL.createObjectURL(await response.blob()),previous=image.dataset.objectUrl;image.src=objectUrl;image.dataset.objectUrl=objectUrl;if(previous)URL.revokeObjectURL(previous)}catch(error){image.alt=error.message}finally{delete image.dataset.loading}}
+async function refreshPreview(image){if(image.dataset.loading)return;image.dataset.loading='1';try{const r=await fetch(preview(image.dataset.previewKind,image.dataset.previewIndex),{cache:'no-store'});if(!r.ok)throw Error(`Preview HTTP ${r.status}`);const url=URL.createObjectURL(await r.blob()),previous=image.dataset.objectUrl;image.src=url;image.dataset.objectUrl=url;if(previous)URL.revokeObjectURL(previous)}catch(e){image.alt=e.message}finally{delete image.dataset.loading}}
 function refreshPreviews(){document.querySelectorAll('.feed[data-preview-kind]').forEach(refreshPreview)}
-async function refreshRadar(){if(mode!=='bench')return;try{renderRadar((await api('/api/status')).radar)}catch(error){$('radarIndicator').textContent='Radar: unavailable'}}
-status();scans();setInterval(scans,10000);setInterval(()=>{if(mode==='bench')refreshPreviews()},1000);setInterval(refreshRadar,250);
+$('snapshot').onclick=async()=>{try{const r=await api('/api/snapshot',{method:'POST'});$('status').textContent='Saved '+r.event_id}catch(e){alert(e.message)}};$('toggle').onclick=()=>{$('calibration').classList.toggle('active');renderCanvas()};
+$('mosaicCanvas').addEventListener('pointerdown',e=>{const box=e.currentTarget.getBoundingClientRect(),x=(e.clientX-box.left)/canvasScale,y=(e.clientY-box.top)/canvasScale;for(const layer of [...layers].reverse()){const inv=inverse(layer.matrix);if(!inv)continue;const [sx,sy]=apply(inv,x,y);if(sx>=0&&sy>=0&&sx<=layer.native_size[0]&&sy<=layer.native_size[1]){selectLayer(layer.id);drag={x,y};e.currentTarget.setPointerCapture(e.pointerId);break}}});$('mosaicCanvas').addEventListener('pointermove',e=>{if(!drag)return;const box=e.currentTarget.getBoundingClientRect(),x=(e.clientX-box.left)/canvasScale,y=(e.clientY-box.top)/canvasScale,layer=selected();layer.matrix=normalize(multiply(translate(x-drag.x,y-drag.y),layer.matrix));drag={x,y};renderCanvas()});for(const event of ['pointerup','pointercancel','pointerleave'])$('mosaicCanvas').addEventListener(event,()=>drag=null);
+$('alpha').oninput=()=>{const layer=selected();if(layer){layer.opacity=+$('alpha').value;renderCanvas()}};let controlScale=1,controlRotation=0;$('scale').oninput=()=>{const value=+$('scale').value;applyDelta([value/controlScale,0,0,0,value/controlScale,0,0,0,1]);controlScale=value};$('rotation').oninput=()=>{const next=+$('rotation').value,delta=(next-controlRotation)*Math.PI/180,c=Math.cos(delta),s=Math.sin(delta);applyDelta([c,-s,0,s,c,0,0,0,1]);controlRotation=next};$('flipHorizontal').onclick=()=>applyDelta([-1,0,0,0,1,0,0,0,1]);$('flipVertical').onclick=()=>applyDelta([1,0,0,0,-1,0,0,0,1]);$('resetLayer').onclick=()=>{const layer=selected();if(layer){layer.matrix=identityFor(layer);controlScale=1;controlRotation=0;$('scale').value=1;$('rotation').value=0;renderCanvas()}};
+$('saveAll').onclick=async()=>{try{const r=await api('/api/calibration/transforms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({revision,transforms:layers.map(l=>({pair:l.pair,source:l.source,matrix:l.matrix}))})});revision=r.revision;$('calibrationStatus').textContent=`Saved ${r.count} layer transforms. Layout remains uncalibrated.`}catch(e){$('calibrationStatus').textContent=e.message}};$('savePoints').onclick=async()=>{const layer=selected();if(!layer)return;try{const body=JSON.parse($('points').value);body.pair=layer.pair;body.source=layer.source;const r=await api('/api/calibration/homography',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});layer.matrix=normalize(r.transform);revision=r.revision;$('calibrationStatus').textContent=`Anchor saved. RMS reprojection error: ${r.rms.toFixed(2)} px`;renderCanvas()}catch(e){$('calibrationStatus').textContent=e.message}};
+status(true);scans();setInterval(scans,10000);setInterval(()=>{if(mode==='bench'){refreshPreviews();layers.forEach(refreshLayerImage);status(false)}},1000);
 </script></body></html>"""
 
 
@@ -74,17 +82,38 @@ class BenchHardware:
         from picamera2 import Picamera2
 
         try:
-            for index in self.config["visible_camera_indexes"]:
-                camera = Picamera2(index)
-                camera.configure(camera.create_still_configuration(main={"size": (2304, 1296), "format": "RGB888"}))
-                camera.start()
-                self.cameras[index] = camera
+            camera_ids = set()
+            source_names = set()
+            for source in self.config["visible_sources"]:
+                visible = parse_bench_visible_source(source)
+                if visible["id"] in camera_ids or source["name"] in source_names:
+                    raise ValueError("Bench visible source IDs and names must be unique")
+                camera_ids.add(visible["id"])
+                source_names.add(source["name"])
+                if visible["kind"] == "picamera2":
+                    camera = Picamera2(visible["index"])
+                    camera.configure(camera.create_still_configuration(main={"size": visible["size"], "format": "RGB888"}))
+                    camera.start()
+                else:
+                    camera = cv2.VideoCapture(visible["device"], cv2.CAP_V4L2)
+                    camera.set(cv2.CAP_PROP_FRAME_WIDTH, visible["size"][0])
+                    camera.set(cv2.CAP_PROP_FRAME_HEIGHT, visible["size"][1])
+                    if not camera.isOpened():
+                        raise RuntimeError(f"Could not open {visible['device']}")
+                self.cameras[visible["id"]] = (source, visible, camera)
             i2c = busio.I2C(board.SCL, board.SDA)
             multiplexer = None
+            thermal_channels = set()
             for source in self.config["thermal_sources"]:
+                if source["name"] in source_names:
+                    raise ValueError("Bench source names must be unique")
+                source_names.add(source["name"])
                 if source["kind"] == "direct":
                     bus = i2c
                 elif source["kind"] == "tca9548a":
+                    if source["channel"] in thermal_channels:
+                        raise ValueError("Bench TCA9548A channels must be unique")
+                    thermal_channels.add(source["channel"])
                     multiplexer = multiplexer or TCA9548A(i2c)
                     bus = multiplexer[source["channel"]]
                 else:
@@ -92,61 +121,60 @@ class BenchHardware:
                 thermal = adafruit_mlx90640.MLX90640(bus)
                 thermal.refresh_rate = adafruit_mlx90640.RefreshRate.REFRESH_4_HZ
                 self.thermals.append((source, thermal))
-            radar_config = self.config.get("radar", {})
-            if radar_config.get("enabled", False):
-                self.radar = DigitalInputDevice(radar_config.get("bcm_pin", 17), pull_up=False)
-                self.radar_active_high = radar_config.get("active_high", True)
+            radar = self.config.get("radar", {})
+            if radar.get("enabled", False):
+                self.radar = DigitalInputDevice(radar.get("bcm_pin", 17), pull_up=False)
+                self.radar_active_high = radar.get("active_high", True)
         except Exception:
             self.close()
             raise
 
     def close(self):
-        for camera in self.cameras.values():
-            camera.close()
+        for _source, visible, camera in self.cameras.values():
+            if visible["kind"] == "picamera2":
+                camera.close()
+            else:
+                camera.release()
         self.cameras.clear()
         if self.radar is not None:
             self.radar.close()
             self.radar = None
 
+    def visible(self, source_id, stamp=False):
+        with self.lock:
+            if source_id not in self.cameras:
+                raise KeyError(source_id)
+            source, visible, camera = self.cameras[source_id]
+            if visible["kind"] == "picamera2":
+                frame = cv2.cvtColor(camera.capture_array("main"), cv2.COLOR_RGB2BGR)
+            else:
+                success, frame = camera.read()
+                if not success or frame is None:
+                    raise RuntimeError(f"V4L2 capture failed for {visible['device']}")
+            return self._stamp(frame, f"VISIBLE {source['name']}") if stamp else frame
+
+    def thermal(self, index):
+        with self.lock:
+            source, sensor = self.thermals[index]
+            frame = np.zeros(768, dtype=np.float32)
+            sensor.getFrame(frame)
+            return source, frame.reshape(24, 32)
+
     def radar_status(self):
         if self.radar is None:
             return {"enabled": False, "detected": False}
         with self.lock:
-            detected = bool(self.radar.value)
-        return {"enabled": True, "detected": detected if self.radar_active_high else not detected}
+            value = bool(self.radar.value)
+        return {"enabled": True, "detected": value if self.radar_active_high else not value}
 
-    def visible(self, index):
+    def stamp(self, image, label):
         with self.lock:
-            if index not in self.cameras:
-                raise KeyError(index)
-            frame = cv2.cvtColor(self.cameras[index].capture_array("main"), cv2.COLOR_RGB2BGR)
-            return self._stamp(frame, f"VISIBLE {index}")
-
-    def thermal(self, source_index):
-        with self.lock:
-            source, sensor = self.thermals[source_index]
-            frame = np.zeros(24 * 32, dtype=np.float32)
-            sensor.getFrame(frame)
-            return source, frame.reshape(24, 32)
-
-    def stamp_thermal(self, image, name):
-        with self.lock:
-            return self._stamp(image, f"THERMAL {name}")
+            return self._stamp(image, label)
 
     def _stamp(self, image, label):
         self.preview_sequence += 1
-        timestamp = time.monotonic()
         cv2.rectangle(image, (0, 0), (360, 40), (0, 0, 0), -1)
-        cv2.putText(
-            image,
-            f"{label}  #{self.preview_sequence}  {timestamp:.3f}",
-            (10, 27),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.55,
-            (0, 255, 255),
-            1,
-            cv2.LINE_AA,
-        )
+        cv2.putText(image, f"{label}  #{self.preview_sequence}  {time.monotonic():.3f}", (10, 27), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 255), 1, cv2.LINE_AA)
         return image
 
 
@@ -155,18 +183,41 @@ def load_json(path):
         return json.load(source)
 
 
-def jpeg(image, quality=85):
-    ok, encoded = cv2.imencode(".jpg", image, [cv2.IMWRITE_JPEG_QUALITY, quality])
+def layout_revision(layout):
+    payload = json.dumps(layout, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+    return hashlib.sha256(payload).hexdigest()[:16]
+
+
+def save_layout(layout):
+    temporary = LAYOUT_PATH.with_suffix(".json.tmp")
+    with temporary.open("w", encoding="utf-8") as destination:
+        json.dump(layout, destination, indent=2, allow_nan=False)
+        destination.flush()
+        os.fsync(destination.fileno())
+    os.replace(temporary, LAYOUT_PATH)
+
+
+def matrix_or_none(values):
+    matrix = np.asarray(values, dtype=np.float64)
+    if matrix.shape != (3, 3) or not np.isfinite(matrix).all() or abs(np.linalg.det(matrix)) < 1e-9:
+        return None
+    return matrix / matrix[2, 2]
+
+
+def jpeg(image):
+    ok, encoded = cv2.imencode(".jpg", image, [cv2.IMWRITE_JPEG_QUALITY, 85])
     if not ok:
         raise RuntimeError("Could not encode preview")
     return encoded.tobytes()
 
 
-def preview_response(image):
+def image_response(image, rectified=None):
     response = Response(jpeg(image), mimetype="image/jpeg")
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
+    if rectified is not None:
+        response.headers["X-Scanner-Rectified"] = str(bool(rectified)).lower()
     return response
 
 
@@ -179,27 +230,47 @@ def thermal_preview(frame, thermal_range):
     return image
 
 
-def source_size(source):
-    return (2304, 1296) if source == "visible" else (32, 24)
-
-
-def to_canvas_key(source):
+def source_key(source):
     return f"{source}_to_canvas"
 
 
-def source_to_stage(source, stage_size):
-    width, height = source_size(source)
-    slot_width = stage_size[0] / 2
-    return np.array([
-        [slot_width / width, 0, (stage_size[0] - slot_width) / 2],
-        [0, stage_size[1] / height, 0],
-        [0, 0, 1],
-    ], dtype=np.float64)
+def parse_bench_visible_source(source):
+    if source.get("kind") not in {"picamera2", "v4l2"}:
+        raise ValueError("Bench visible source kind must be picamera2 or v4l2")
+    size = source.get("size")
+    if not isinstance(size, list) or len(size) != 2 or any(not isinstance(value, int) or value <= 0 for value in size):
+        raise ValueError("Bench visible source size must contain positive width and height")
+    visible = {"kind": source["kind"], "size": tuple(size)}
+    if visible["kind"] == "picamera2":
+        if not isinstance(source.get("index"), int) or source["index"] < 0:
+            raise ValueError("Bench Picamera2 source requires a non-negative index")
+        visible["index"] = source["index"]
+        visible["id"] = f"picamera2:{source['index']}"
+    else:
+        device = source.get("device")
+        if not isinstance(device, str) or not device.startswith("/dev/"):
+            raise ValueError("Bench V4L2 source requires an absolute /dev device path")
+        visible["device"] = device
+        visible["id"] = f"v4l2:{device}"
+    return visible
+
+
+def source_size(source):
+    return [2304, 1296] if source == "visible" else [32, 24]
+
+
+def rectify(image, pair, source):
+    matrix = matrix_or_none(pair.get(f"{source}_camera_matrix"))
+    distortion = np.asarray(pair.get(f"{source}_distortion_coefficients"), dtype=np.float64).reshape(-1)
+    if matrix is None or distortion.size < 4 or not np.isfinite(distortion).all():
+        return image, False
+    return cv2.undistort(image, matrix, distortion), True
 
 
 def create_app(mode):
     app = Flask(__name__)
     layout = load_json(LAYOUT_PATH)
+    layout_lock = threading.Lock()
     bench = None
     startup_error = None
     if mode == "bench":
@@ -209,11 +280,62 @@ def create_app(mode):
         except Exception as error:
             startup_error = str(error)
 
+    def pair_by_name(name):
+        return next((pair for pair in layout.get("pairs", []) if pair["name"] == name), None)
+
+    def thermal_indexes():
+        return {source.get("pair_name"): index for index, (source, _sensor) in enumerate(bench.thermals) if source.get("pair_name")} if bench else {}
+
+    def visible_indexes():
+        return {
+            source.get("pair_name"): visible["id"]
+            for source, visible, _camera in bench.cameras.values()
+            if source.get("pair_name")
+        } if bench else {}
+
+    def available_sources():
+        thermal_by_pair = thermal_indexes()
+        visible_by_pair = visible_indexes()
+        sources = []
+        for pair in layout.get("pairs", []):
+            visible_index = visible_by_pair.get(pair["name"])
+            for source, index in (("visible", visible_index), ("thermal", thermal_by_pair.get(pair["name"]))):
+                available = (source == "visible" and bench is not None and index in bench.cameras) or (source == "thermal" and index is not None)
+                transform = pair.get(source_key(source))
+                sources.append({
+                    "id": f"{pair['name']}:{source}",
+                    "pair": pair["name"],
+                    "source": source,
+                    "name": f"{pair['name']} {source}",
+                    "available": available,
+                    "index": index,
+                    "native_size": source_size(source),
+                    "matrix": transform,
+                    "rectified": matrix_or_none(pair.get(f"{source}_camera_matrix")) is not None,
+                })
+        return sources
+
+    def calibration_image(pair, source):
+        if bench is None:
+            raise RuntimeError(startup_error or "Bench hardware is unavailable")
+        source_info = next((item for item in available_sources() if item["pair"] == pair["name"] and item["source"] == source), None)
+        if source_info is None or not source_info["available"]:
+            raise KeyError(source)
+        if source == "visible":
+            image, rectified = rectify(bench.visible(source_info["index"]), pair, source)
+            return image, rectified
+        _thermal_source, temperatures = bench.thermal(source_info["index"])
+        temperatures, rectified = rectify(temperatures, pair, source)
+        low, high = layout["thermal_range_c"]
+        heatmap = cv2.applyColorMap(np.uint8(np.clip((temperatures - low) / (high - low), 0, 1) * 255), cv2.COLORMAP_INFERNO)
+        return heatmap, rectified
+
     @app.get("/")
     def index():
         return render_template_string(PAGE, mode=mode)
 
     @app.errorhandler(404)
+    @app.errorhandler(409)
     @app.errorhandler(502)
     @app.errorhandler(503)
     def api_error(error):
@@ -223,34 +345,29 @@ def create_app(mode):
 
     @app.get("/api/status")
     def status():
-        thermal_indexes = {
-            source.get("pair_name"): index
-            for index, (source, _sensor) in enumerate(bench.thermals)
-            if source.get("pair_name")
-        } if bench else {}
-        return jsonify({
-            "mode": mode,
-            "message": startup_error or ("Hardware preview ready" if bench else "Inspection artifact viewer ready"),
-            "calibrated": bool(layout.get("calibrated")),
-            "visible": list(bench.cameras) if bench else [],
-            "thermal": [source for source, _sensor in bench.thermals] if bench else [],
-            "radar": bench.radar_status() if bench else {"enabled": False, "detected": False},
-            "pairs": [
-                {
-                    "name": pair["name"],
-                    "visible_camera_index": pair["visible_camera_index"],
-                    "bench_thermal_index": thermal_indexes.get(pair["name"]),
-                }
-                for pair in layout.get("pairs", [])
-            ],
-        })
+        with layout_lock:
+            return jsonify({
+                "mode": mode,
+                "message": startup_error or ("Hardware preview ready" if bench else "Inspection artifact viewer ready"),
+                "calibrated": bool(layout.get("calibrated")),
+                "revision": layout_revision(layout),
+                "canvas": layout["canvas"],
+                "visible": [
+                    {**source, "source_id": visible["id"]}
+                    for source, visible, _camera in bench.cameras.values()
+                ] if bench else [],
+                "thermal": [source for source, _sensor in bench.thermals] if bench else [],
+                "radar": bench.radar_status() if bench else {"enabled": False, "detected": False},
+                "sources": available_sources(),
+            })
 
-    @app.get("/api/preview/visible/<int:index>.jpg")
-    def visible_preview(index):
+    @app.get("/api/preview/visible.jpg")
+    def visible_preview():
         if bench is None:
             abort(503, startup_error or "Bench hardware is unavailable")
         try:
-            return preview_response(cv2.resize(bench.visible(index), (960, 540)))
+            source_id = request.args.get("source_id", "")
+            return image_response(cv2.resize(bench.visible(source_id, stamp=True), (960, 540)))
         except KeyError:
             abort(404)
 
@@ -260,11 +377,27 @@ def create_app(mode):
             abort(503, startup_error or "Bench hardware is unavailable")
         try:
             source, frame = bench.thermal(index)
-            return preview_response(bench.stamp_thermal(thermal_preview(frame, layout["thermal_range_c"]), source["name"]))
+            return image_response(bench.stamp(thermal_preview(frame, layout["thermal_range_c"]), f"THERMAL {source['name']}"))
         except IndexError:
             abort(404)
         except Exception as error:
             abort(502, f"Thermal read failed: {error}")
+
+    @app.get("/api/calibration/preview/<pair_name>/<source>.jpg")
+    def calibration_preview(pair_name, source):
+        if source not in {"visible", "thermal"}:
+            abort(404)
+        with layout_lock:
+            pair = pair_by_name(pair_name)
+            if pair is None:
+                abort(404)
+            try:
+                image, rectified = calibration_image(pair, source)
+                return image_response(image, rectified)
+            except KeyError:
+                abort(404, f"{pair_name} {source} is not available in bench mode")
+            except Exception as error:
+                abort(502, f"Corrected preview failed: {error}")
 
     @app.post("/api/snapshot")
     def snapshot():
@@ -272,8 +405,8 @@ def create_app(mode):
             return jsonify(error=startup_error or "Bench hardware is unavailable"), 503
         event_id = datetime.now().strftime("bench_%Y%m%d_%H%M%S_%f")
         try:
-            for index in bench.cameras:
-                cv2.imwrite(str(CAPTURE_DIR / f"{event_id}_camera{index}.jpg"), bench.visible(index))
+            for source_id, (source, _visible, _camera) in bench.cameras.items():
+                cv2.imwrite(str(CAPTURE_DIR / f"{event_id}_{source['name']}.jpg"), bench.visible(source_id))
             for index in range(len(bench.thermals)):
                 source, frame = bench.thermal(index)
                 np.save(CAPTURE_DIR / f"{event_id}_{source['name']}.npy", frame)
@@ -284,54 +417,56 @@ def create_app(mode):
 
     @app.post("/api/calibration/homography")
     def save_homography():
+        nonlocal layout
         body = request.get_json(silent=True) or {}
-        pair = next((pair for pair in layout.get("pairs", []) if pair["name"] == body.get("pair")), None)
+        source = body.get("source")
         source_points = np.asarray(body.get("source_points"), dtype=np.float32)
         canvas_points = np.asarray(body.get("canvas_points"), dtype=np.float32)
-        if pair is None or body.get("source") not in {"visible", "thermal"}:
-            return jsonify(error="Select a known pair and visible or thermal source"), 400
-        if source_points.shape != canvas_points.shape or source_points.ndim != 2 or source_points.shape[0] < 4 or source_points.shape[1] != 2:
-            return jsonify(error="Provide four or more [x, y] source and canvas point pairs"), 400
+        if source not in {"visible", "thermal"} or source_points.shape != canvas_points.shape or source_points.ndim != 2 or source_points.shape[0] < 4 or source_points.shape[1] != 2:
+            return jsonify(error="Provide a known source and four or more [x, y] point pairs"), 400
         homography, mask = cv2.findHomography(source_points, canvas_points, cv2.RANSAC)
-        if homography is None or int(mask.sum()) < 4:
+        matrix = matrix_or_none(homography)
+        if matrix is None or int(mask.sum()) < 4:
             return jsonify(error="Points do not produce a valid homography"), 400
-        projected = cv2.perspectiveTransform(source_points[None, :, :], homography)[0]
+        projected = cv2.perspectiveTransform(source_points[None, :, :], matrix.astype(np.float32))[0]
         rms = float(np.sqrt(np.mean(np.sum((projected - canvas_points) ** 2, axis=1))))
-        pair[f"{body['source']}_to_canvas"] = homography.tolist()
-        layout["calibrated"] = False
-        with LAYOUT_PATH.open("w", encoding="utf-8") as destination:
-            json.dump(layout, destination, indent=2)
-        return jsonify(rms=rms)
+        with layout_lock:
+            pair = pair_by_name(body.get("pair"))
+            if pair is None:
+                return jsonify(error="Select a known pair"), 400
+            candidate = copy.deepcopy(layout)
+            next_pair = next(item for item in candidate["pairs"] if item["name"] == pair["name"])
+            next_pair[source_key(source)] = matrix.tolist()
+            candidate["calibrated"] = False
+            save_layout(candidate)
+            layout = candidate
+            return jsonify(rms=rms, transform=matrix.tolist(), revision=layout_revision(layout))
 
-    @app.post("/api/calibration/relative")
-    def save_relative_transform():
+    @app.post("/api/calibration/transforms")
+    def save_transforms():
+        nonlocal layout
         body = request.get_json(silent=True) or {}
-        reference = next((pair for pair in layout.get("pairs", []) if pair["name"] == body.get("reference_pair")), None)
-        target = next((pair for pair in layout.get("pairs", []) if pair["name"] == body.get("target_pair")), None)
-        reference_source = body.get("reference_source")
-        target_source = body.get("target_source")
-        stage_transform = np.asarray(body.get("stage_transform"), dtype=np.float64)
-        stage_size = body.get("stage_size")
-        if reference is None or target is None or reference_source not in {"visible", "thermal"} or target_source not in {"visible", "thermal"}:
-            return jsonify(error="Select known reference and target pair sources"), 400
-        if stage_transform.shape != (3, 3) or not np.isfinite(stage_transform).all() or np.isclose(stage_transform[2, 2], 0):
-            return jsonify(error="Stage transform must be a finite 3x3 matrix"), 400
-        if not isinstance(stage_size, list) or len(stage_size) != 2 or any(not isinstance(value, (int, float)) or value <= 0 for value in stage_size):
-            return jsonify(error="Stage size must contain positive width and height"), 400
-        reference_transform = reference.get(to_canvas_key(reference_source))
-        if reference_transform is None:
-            return jsonify(error=f"Anchor {reference['name']} {reference_source} to the shared canvas before relative registration"), 400
-        reference_transform = np.asarray(reference_transform, dtype=np.float64)
-        if reference_transform.shape != (3, 3) or not np.isfinite(reference_transform).all():
-            return jsonify(error="Reference canvas transform is invalid"), 400
-
-        # Browser transform is target-stage -> reference-stage. Convert it to target pixels -> canvas pixels.
-        target_transform = reference_transform @ np.linalg.inv(source_to_stage(reference_source, stage_size)) @ stage_transform @ source_to_stage(target_source, stage_size)
-        target[to_canvas_key(target_source)] = (target_transform / target_transform[2, 2]).tolist()
-        layout["calibrated"] = False
-        with LAYOUT_PATH.open("w", encoding="utf-8") as destination:
-            json.dump(layout, destination, indent=2)
-        return jsonify(target_key=to_canvas_key(target_source), transform=target[to_canvas_key(target_source)])
+        records = body.get("transforms")
+        if not isinstance(records, list) or not records:
+            return jsonify(error="Provide one or more layer transforms"), 400
+        with layout_lock:
+            if body.get("revision") != layout_revision(layout):
+                return jsonify(error="Layout changed in another session; reload before saving"), 409
+            candidate = copy.deepcopy(layout)
+            known = {(pair["name"], source) for pair in candidate["pairs"] for source in ("visible", "thermal")}
+            seen = set()
+            for record in records:
+                key = (record.get("pair"), record.get("source"))
+                matrix = matrix_or_none(record.get("matrix"))
+                if key not in known or key in seen or matrix is None:
+                    return jsonify(error="Every transform must name a unique known pair/source with a valid 3x3 matrix"), 400
+                seen.add(key)
+                next_pair = next(pair for pair in candidate["pairs"] if pair["name"] == key[0])
+                next_pair[source_key(key[1])] = matrix.tolist()
+            candidate["calibrated"] = False
+            save_layout(candidate)
+            layout = candidate
+            return jsonify(count=len(records), revision=layout_revision(layout))
 
     @app.get("/api/scans")
     def scans():

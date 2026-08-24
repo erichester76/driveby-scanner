@@ -6,10 +6,12 @@ The scanner will not create an inspection image until
 
 ## Pair Mapping
 
-Each `pairs` entry is one physical visible/thermal unit. `name`,
-`visible_camera_index`, and `thermal_tca_channel` must be unique. Add a center
-unit by adding another object with its actual Picamera2 index and TCA9548A
-channel; also map the corresponding `/dev/videoX` in `docker-compose.yml`.
+Each `pairs` entry is one physical visible/thermal unit. `name`, the visible
+source identity, and `thermal_tca_channel` must be unique. Add a center unit
+with a `visible` descriptor and a TCA9548A channel. CSI/HAT sources use
+`{"kind": "picamera2", "index": 2, "size": [...]}`; USB UVC sources use
+`{"kind": "v4l2", "device": "/dev/v4l/by-id/...", "size": [...]}`. For a
+USB source, also map the resolved `/dev/videoX` in `docker-compose.yml`.
 
 ## Canvas Transforms
 
@@ -52,6 +54,12 @@ Map bench thermal sources to their physical pair with `pair_name` in
 `config/bench.json`. Only mapped thermal sources can be used in the drag
 workbench. The display is for fine adjustment; verify the transform with the
 calibration target and record the result before setting `calibrated: true`.
+
+The corrected multi-layer canvas uses the same `source -> canvas` transform
+contract as deployed capture. It rectifies each layer when its intrinsics are
+present, shows every configured source available in bench mode, and lets the
+operator select one layer at a time. Save All writes those selected source
+transforms atomically and preserves `calibrated: false`.
 
 The final inspection size is `inspection_roi`, not a camera frame size. Make
 the canvas and ROI wide enough for all fixed camera fields plus their overlap;
