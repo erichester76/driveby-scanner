@@ -177,8 +177,9 @@ def capture_frame_set(pairs, visible_cameras, thermal_sensors):
             "frame": cv2.cvtColor(visible_cameras[index].capture_array("main"), cv2.COLOR_RGB2BGR),
             "captured_at": time.monotonic(),
         }
-        frame = np.zeros((THERMAL_HEIGHT, THERMAL_WIDTH), dtype=np.float32)
+        frame = np.zeros(THERMAL_WIDTH * THERMAL_HEIGHT, dtype=np.float32)
         thermal_sensors[channel].getFrame(frame)
+        frame = frame.reshape(THERMAL_HEIGHT, THERMAL_WIDTH)
         thermal_frames[channel] = {"frame": frame, "captured_at": time.monotonic()}
     return visible_frames, thermal_frames
 

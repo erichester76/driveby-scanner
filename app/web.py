@@ -91,9 +91,9 @@ class BenchHardware:
     def thermal(self, source_index):
         with self.lock:
             source, sensor = self.thermals[source_index]
-            frame = np.zeros((24, 32), dtype=np.float32)
+            frame = np.zeros(24 * 32, dtype=np.float32)
             sensor.getFrame(frame)
-            return source, frame
+            return source, frame.reshape(24, 32)
 
 
 def load_json(path):
@@ -134,6 +134,7 @@ def create_app(mode):
         return render_template_string(PAGE, mode=mode)
 
     @app.errorhandler(404)
+    @app.errorhandler(502)
     @app.errorhandler(503)
     def api_error(error):
         if request.path.startswith("/api/"):
@@ -169,18 +170,23 @@ def create_app(mode):
             return Response(jpeg(thermal_preview(frame, layout["thermal_range_c"])), mimetype="image/jpeg")
         except IndexError:
             abort(404)
+        except Exception as error:
+            abort(502, f"Thermal read failed: {error}")
 
     @app.post("/api/snapshot")
     def snapshot():
         if bench is None:
             return jsonify(error=startup_error or "Bench hardware is unavailable"), 503
         event_id = datetime.now().strftime("bench_%Y%m%d_%H%M%S_%f")
-        for index in bench.cameras:
-            cv2.imwrite(str(CAPTURE_DIR / f"{event_id}_camera{index}.jpg"), bench.visible(index))
-        for index in range(len(bench.thermals)):
-            source, frame = bench.thermal(index)
-            np.save(CAPTURE_DIR / f"{event_id}_{source['name']}.npy", frame)
-            cv2.imwrite(str(CAPTURE_DIR / f"{event_id}_{source['name']}.png"), thermal_preview(frame, layout["thermal_range_c"]))
+        try:
+            for index in bench.cameras:
+                cv2.imwrite(str(CAPTURE_DIR / f"{event_id}_camera{index}.jpg"), bench.visible(index))
+            for index in range(len(bench.thermals)):
+                source, frame = bench.thermal(index)
+                np.save(CAPTURE_DIR / f"{event_id}_{source['name']}.npy", frame)
+                cv2.imwrite(str(CAPTURE_DIR / f"{event_id}_{source['name']}.png"), thermal_preview(frame, layout["thermal_range_c"]))
+        except Exception as error:
+            return jsonify(error=f"Bench snapshot failed: {error}"), 502
         return jsonify(event_id=event_id)
 
     @app.post("/api/calibration/homography")

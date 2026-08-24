@@ -115,6 +115,10 @@ accepts matched-point homography input, and lists deployed inspection mosaics.
 Saving a homography never enables deployed capture: it keeps
 `calibrated: false` until all calibration values are reviewed.
 
+MLX90640 reads are stored as 32x24 Celsius arrays after acquisition. The
+underlying Adafruit driver requires a flat 768-value buffer, so do not pass it a
+pre-shaped 32x24 array when adding thermal capture code.
+
 Use viewer-only mode when the deployed scanner process owns the hardware:
 
 ```bash
