@@ -106,6 +106,10 @@ to the Pi I2C bus. When the TCA9548A is installed, replace the direct source in
 `config/bench.json` with one or more `"kind": "tca9548a"` sources and their
 channels.
 
+For a direct thermal bench test outside Docker, install Blinka's Raspberry Pi
+GPIO backend with `sudo apt install -y python3-lgpio`. The Docker image already
+includes this package.
+
 The console provides live visible and thermal previews, saves bench snapshots,
 accepts matched-point homography input, and lists deployed inspection mosaics.
 Saving a homography never enables deployed capture: it keeps

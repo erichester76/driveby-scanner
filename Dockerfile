@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     i2c-tools \
     python3-gpiozero \
     python3-flask \
+    python3-lgpio \
     python3-picamera2 \
     python3-pip \
     python3-rpi.gpio \

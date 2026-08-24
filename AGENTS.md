@@ -18,7 +18,7 @@
 ## Container Runtime
 
 - Build with `docker compose build` on a 64-bit Raspberry Pi OS Bookworm host. The Dockerfile starts from official Debian and adds Raspberry Pi's official APT archive because upstream Debian lacks `Picamera2`.
-- Install `picamera2`, `gpiozero`, `RPi.GPIO`, NumPy, Pillow, and OpenCV with `apt`; do not install or upgrade them with `pip`, because `Picamera2` includes compiled extensions tied to the distro NumPy ABI.
+- Install `picamera2`, `gpiozero`, `lgpio`, `RPi.GPIO`, NumPy, Pillow, and OpenCV with `apt`; do not install or upgrade them with `pip`, because `Picamera2` includes compiled extensions tied to the distro NumPy ABI.
 - The compose service is deliberately privileged and maps I2C, GPIO, and two video devices. Add the matching `/dev/videoX` mapping when adding a visible camera pair.
 
 ## Dependencies
