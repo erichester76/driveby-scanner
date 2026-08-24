@@ -111,8 +111,8 @@ GPIO backend with `sudo apt install -y python3-lgpio`. The Docker image already
 includes this package.
 
 The console provides live visible and thermal previews, saves bench snapshots,
-accepts matched-point homography input, and lists deployed inspection mosaics.
-Saving a homography never enables deployed capture: it keeps
+supports point anchoring plus drag/scale/rotate relative registration, and
+lists deployed inspection mosaics. Saving a transform never enables deployed capture: it keeps
 `calibrated: false` until all calibration values are reviewed.
 
 MLX90640 reads are stored as 32x24 Celsius arrays after acquisition. The

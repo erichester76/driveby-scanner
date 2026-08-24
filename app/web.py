@@ -19,23 +19,33 @@ CAPTURE_DIR.mkdir(exist_ok=True)
 PAGE = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Drive-Over Scanner</title><style>
-:root{color-scheme:dark;--bg:#101413;--panel:#18201e;--line:#31403b;--ink:#e8eee8;--muted:#a6b3aa;--accent:#d6f27d;--warning:#ffca68}
-*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top,#22322c,var(--bg) 42rem);color:var(--ink);font:15px/1.45 system-ui,sans-serif}main{max-width:1400px;margin:auto;padding:28px}h1{font-size:clamp(1.7rem,4vw,3rem);margin:0}h2{font-size:1rem;text-transform:uppercase;letter-spacing:.09em;color:var(--muted)}header{display:flex;justify-content:space-between;gap:16px;align-items:end;border-bottom:1px solid var(--line);padding-bottom:20px}.mode{color:var(--accent);font-weight:700;text-transform:uppercase;letter-spacing:.12em}.notice{margin:18px 0;padding:12px 14px;background:#25251a;border-left:3px solid var(--warning);color:#f9e7bb}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:16px}.panel{background:color-mix(in srgb,var(--panel),transparent 7%);border:1px solid var(--line);padding:16px;border-radius:8px}.feed{width:100%;aspect-ratio:16/9;object-fit:contain;background:#090c0b;border:1px solid #27332f}.thermal{image-rendering:pixelated}.controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:18px 0}button{border:0;border-radius:4px;background:var(--accent);color:#152014;padding:11px 15px;font-weight:750;cursor:pointer}button:disabled{opacity:.45;cursor:not-allowed}.status{color:var(--muted)}.scans{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px}.scan{border:1px solid var(--line);padding:10px;border-radius:7px}.scan img{width:100%;background:#090c0b}.scan a{color:var(--accent);text-decoration:none}.calibration{display:none}.calibration.active{display:block}textarea{width:100%;min-height:150px;background:#0c100f;color:var(--ink);border:1px solid var(--line);padding:10px;font:12px ui-monospace,monospace}@media(max-width:600px){main{padding:16px}header{align-items:start;flex-direction:column}}
+:root{color-scheme:dark;--bg:#101413;--panel:#18201e;--line:#31403b;--ink:#e8eee8;--muted:#a6b3aa;--accent:#d6f27d;--warning:#ffca68;--blue:#8bd5ff}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top,#22322c,var(--bg) 42rem);color:var(--ink);font:15px/1.45 system-ui,sans-serif}main{max-width:1440px;margin:auto;padding:28px}h1{font-size:clamp(1.7rem,4vw,3rem);margin:0}h2{font-size:1rem;text-transform:uppercase;letter-spacing:.09em;color:var(--muted)}header{display:flex;justify-content:space-between;gap:16px;align-items:end;border-bottom:1px solid var(--line);padding-bottom:20px}.mode{color:var(--accent);font-weight:700;text-transform:uppercase;letter-spacing:.12em}.notice{margin:18px 0;padding:12px 14px;background:#25251a;border-left:3px solid var(--warning);color:#f9e7bb}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:16px}.panel{background:color-mix(in srgb,var(--panel),transparent 7%);border:1px solid var(--line);padding:16px;border-radius:8px}.feed{width:100%;aspect-ratio:16/9;object-fit:contain;background:#090c0b;border:1px solid #27332f}.thermal{image-rendering:pixelated}.controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:18px 0}button{border:0;border-radius:4px;background:var(--accent);color:#152014;padding:11px 15px;font-weight:750;cursor:pointer}button.secondary{background:#2a3933;color:var(--ink)}button:disabled{opacity:.45;cursor:not-allowed}.status{color:var(--muted)}.scans{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px}.scan{border:1px solid var(--line);padding:10px;border-radius:7px}.scan img{width:100%;background:#090c0b}.scan a{color:var(--accent);text-decoration:none}.calibration{display:none}.calibration.active{display:block}textarea{width:100%;min-height:125px;background:#0c100f;color:var(--ink);border:1px solid var(--line);padding:10px;font:12px ui-monospace,monospace}select,input{background:#0c100f;color:var(--ink);border:1px solid var(--line);padding:7px}.registration{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:16px}.stage{position:relative;width:100%;aspect-ratio:16/9;background:#070908;border:1px solid var(--line);overflow:hidden;touch-action:none}.stage img{position:absolute;width:100%;height:100%;object-fit:fill;user-select:none;-webkit-user-drag:none}.stage #movingLayer{opacity:.5;cursor:grab;transform-origin:50% 50%;filter:saturate(1.25)}.stage #movingLayer.dragging{cursor:grabbing}.readout{font:12px ui-monospace,monospace;color:var(--blue);white-space:pre-wrap}.help{color:var(--muted);margin-top:0}.source-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}.legacy{margin-top:20px}.legend-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--blue);margin-right:5px}@media(max-width:750px){main{padding:16px}header{align-items:start;flex-direction:column}.registration{grid-template-columns:1fr}.source-row{grid-template-columns:1fr}}
 </style></head><body><main>
 <header><div><div class="mode" id="mode"></div><h1>Undercarriage Scan Console</h1></div><div class="status" id="status">Connecting...</div></header>
 <div class="notice" id="notice"></div>
-<section id="bench"><div class="controls"><button id="snapshot">Save bench snapshot</button><button id="toggle">Show calibration editor</button></div><div class="grid" id="feeds"></div>
-<div class="panel calibration" id="calibration"><h2>Homography editor</h2><p>Enter four or more matching source and canvas points. This writes only the selected homography; it never sets <code>calibrated</code> to true.</p><label>Pair <select id="pair"></select></label> <label>Source <select id="source"><option value="visible">Visible</option><option value="thermal">Thermal</option></select></label><textarea id="points" placeholder='{"source_points":[[x,y],[x,y],[x,y],[x,y]],"canvas_points":[[x,y],[x,y],[x,y],[x,y]]}'></textarea><button id="saveCalibration">Calculate and save transform</button><span class="status" id="calibrationStatus"></span></div></section>
+<section id="bench"><div class="controls"><button id="snapshot">Save bench snapshot</button><button class="secondary" id="toggle">Open registration workbench</button></div><div class="grid" id="feeds"></div>
+<div class="panel calibration" id="calibration"><h2>Relative registration workbench</h2><p class="help">Anchor one source to the shared canvas with point mapping below. Then select that anchored source as reference, drag the blue moving layer into alignment, and save. Drag to translate; use controls for scale, rotation, and blend. This never enables deployed capture.</p>
+<div class="registration"><div><div class="source-row"><label>Reference pair<br><select id="referencePair"></select></label><label>Reference source<br><select id="referenceSource"><option value="visible">Visible</option><option value="thermal">Thermal</option></select></label><label>Moving target pair<br><select id="targetPair"></select></label><label>Moving source<br><select id="targetSource"><option value="visible">Visible</option><option value="thermal">Thermal</option></select></label></div><div class="stage" id="stage"><img id="referenceLayer" alt="Reference source"><img id="movingLayer" alt="Moving source"></div></div><aside><h2>Layer controls</h2><label>Blend <input id="alpha" type="range" min="0.1" max="0.9" value="0.5" step="0.05"></label><br><label>Scale <input id="scale" type="range" min="0.5" max="1.8" value="1" step="0.005"></label><br><label>Rotation <input id="rotation" type="range" min="-20" max="20" value="0" step="0.1"></label><div class="controls"><button class="secondary" id="resetTransform">Reset</button><button id="saveRelative">Save registration</button></div><div class="readout" id="transformReadout"></div><p class="help"><span class="legend-dot"></span>The moving layer is blue-tinted. Save requires the selected reference transform to already be defined.</p></aside></div>
+<details class="legacy"><summary>Anchor a source to the shared canvas with matched points</summary><p class="help">Use this only to establish a reference transform. Enter four or more matching source and shared-canvas points.</p><label>Target pair <select id="pointPair"></select></label> <label>Source <select id="pointSource"><option value="visible">Visible</option><option value="thermal">Thermal</option></select></label><textarea id="points" placeholder='{"source_points":[[x,y],[x,y],[x,y],[x,y]],"canvas_points":[[x,y],[x,y],[x,y],[x,y]]}'></textarea><button id="savePoints">Calculate and save anchor transform</button><span class="status" id="calibrationStatus"></span></details></div></section>
 <section><h2>Technician inspections</h2><div class="scans" id="scans"></div></section>
 </main><script>
-const mode={{ mode|tojson }};let info={};
-async function api(path,options){const r=await fetch(path,options);const data=await r.json();if(!r.ok)throw Error(data.error||r.statusText);return data}
+const mode={{ mode|tojson }}, stageSize=[960,540];let info={},drag=null,transform={x:0,y:0,scale:1,rotation:0};
+const $=id=>document.querySelector('#'+id);async function api(path,options){const r=await fetch(path,options);const data=await r.json();if(!r.ok)throw Error(data.error||r.statusText);return data}
 function feed(src,label,thermal=false){return `<article class="panel"><h2>${label}</h2><img class="feed ${thermal?'thermal':''}" src="${src}?t=${Date.now()}" onerror="this.alt='Waiting for source'" alt="${label}"></article>`}
-async function status(){try{info=await api('/api/status');document.querySelector('#mode').textContent=info.mode;document.querySelector('#status').textContent=info.message;document.querySelector('#notice').textContent=info.calibrated?'Calibration is marked active. Review artifacts and coverage before unattended operation.':'Bench mode is safe for uncalibrated hardware. Deployed capture refuses to produce inspection images until calibration is complete.';if(mode==='bench'){document.querySelector('#feeds').innerHTML=info.visible.map(i=>feed('/api/preview/visible/'+i+'.jpg','Visible camera '+i)).join('')+info.thermal.map((s,i)=>feed('/api/preview/thermal/'+i+'.jpg',s.name+' thermal',true)).join('');document.querySelector('#pair').innerHTML=info.pairs.map(p=>`<option value="${p.name}">${p.name}</option>`).join('')}else document.querySelector('#bench').hidden=true}catch(e){document.querySelector('#status').textContent=e.message}}
-async function scans(){try{const data=await api('/api/scans');document.querySelector('#scans').innerHTML=data.scans.length?data.scans.map(s=>`<article class="scan"><a href="/captures/${s.image}" target="_blank"><img src="/captures/${s.image}" loading="lazy"><strong>${s.event_id}</strong></a><div class="status">${s.stats}</div></article>`).join(''):'<p class="status">No deployed inspection mosaics yet.</p>'}catch(e){document.querySelector('#scans').textContent=e.message}}
-document.querySelector('#snapshot').onclick=async()=>{try{const r=await api('/api/snapshot',{method:'POST'});document.querySelector('#status').textContent='Saved '+r.event_id}catch(e){alert(e.message)}};
-document.querySelector('#toggle').onclick=()=>document.querySelector('#calibration').classList.toggle('active');
-document.querySelector('#saveCalibration').onclick=async()=>{try{const body=JSON.parse(document.querySelector('#points').value);body.pair=document.querySelector('#pair').value;body.source=document.querySelector('#source').value;const r=await api('/api/calibration/homography',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});document.querySelector('#calibrationStatus').textContent='Saved. RMS reprojection error: '+r.rms.toFixed(2)+' px'}catch(e){document.querySelector('#calibrationStatus').textContent=e.message}};
+function options(select,values){select.innerHTML=values.map(v=>`<option value="${v.name}">${v.name}</option>`).join('')}
+function preview(kind,index){return `/api/preview/${kind}/${index}.jpg?t=${Date.now()}`}
+function pair(name){return info.pairs.find(p=>p.name===name)}function activeSource(selectPair,selectSource){const p=pair($(selectPair).value),source=$(selectSource).value;return source==='visible'?{kind:'visible',index:p.visible_camera_index}:{kind:'thermal',index:p.bench_thermal_index}}
+function matrix(){const r=transform.rotation*Math.PI/180,c=Math.cos(r)*transform.scale,s=Math.sin(r)*transform.scale,cx=stageSize[0]/2,cy=stageSize[1]/2;return [[c,-s,transform.x+cx-c*cx+s*cy],[s,c,transform.y+cy-s*cx-c*cy],[0,0,1]]}
+function renderTransform(){const m=matrix();$('movingLayer').style.opacity=$('alpha').value;$('movingLayer').style.transform=`translate(${transform.x}px,${transform.y}px) scale(${transform.scale}) rotate(${transform.rotation}deg)`;$('transformReadout').textContent=`x: ${transform.x.toFixed(1)} px\ny: ${transform.y.toFixed(1)} px\nscale: ${transform.scale.toFixed(3)}\nrotation: ${transform.rotation.toFixed(1)} deg\nM: ${m.flat().map(v=>v.toFixed(4)).join(', ')}`}
+function loadLayers(){try{const ref=activeSource('referencePair','referenceSource'),target=activeSource('targetPair','targetSource');if(target.index===undefined)throw Error('This thermal source is not available in bench.json');$('referenceLayer').src=preview(ref.kind,ref.index);$('movingLayer').src=preview(target.kind,target.index);renderTransform()}catch(e){$('calibrationStatus').textContent=e.message}}
+async function status(){try{info=await api('/api/status');$('mode').textContent=info.mode;$('status').textContent=info.message;$('notice').textContent=info.calibrated?'Calibration is marked active. Review artifacts and coverage before unattended operation.':'Bench mode is safe for uncalibrated hardware. Deployed capture refuses to produce inspection images until calibration is complete.';if(mode==='bench'){$('feeds').innerHTML=info.visible.map(i=>feed(preview('visible',i),'Visible camera '+i)).join('')+info.thermal.map((s,i)=>feed(preview('thermal',i),s.name+' thermal',true)).join('');options($('referencePair'),info.pairs);options($('targetPair'),info.pairs);options($('pointPair'),info.pairs);$('referencePair').value=info.pairs[0]?.name;$('targetPair').value=info.pairs[0]?.name;loadLayers()}else $('bench').hidden=true}catch(e){$('status').textContent=e.message}}
+async function scans(){try{const data=await api('/api/scans');$('scans').innerHTML=data.scans.length?data.scans.map(s=>`<article class="scan"><a href="/captures/${s.image}" target="_blank"><img src="/captures/${s.image}" loading="lazy"><strong>${s.event_id}</strong></a><div class="status">${s.stats}</div></article>`).join(''):'<p class="status">No deployed inspection mosaics yet.</p>'}catch(e){$('scans').textContent=e.message}}
+$('snapshot').onclick=async()=>{try{const r=await api('/api/snapshot',{method:'POST'});$('status').textContent='Saved '+r.event_id}catch(e){alert(e.message)}};$('toggle').onclick=()=>{$('calibration').classList.toggle('active');loadLayers()};
+for(const id of ['referencePair','referenceSource','targetPair','targetSource'])$(id).onchange=loadLayers;for(const id of ['alpha','scale','rotation'])$(id).oninput=()=>{transform.scale=+$('scale').value;transform.rotation=+$('rotation').value;renderTransform()};$('resetTransform').onclick=()=>{transform={x:0,y:0,scale:1,rotation:0};$('scale').value=1;$('rotation').value=0;renderTransform()};
+$('stage').addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,startX:transform.x,startY:transform.y};$('movingLayer').classList.add('dragging');e.target.setPointerCapture?.(e.pointerId)});$('stage').addEventListener('pointermove',e=>{if(!drag)return;const box=$('stage').getBoundingClientRect();transform.x=drag.startX+(e.clientX-drag.x)*stageSize[0]/box.width;transform.y=drag.startY+(e.clientY-drag.y)*stageSize[1]/box.height;renderTransform()});for(const event of ['pointerup','pointercancel','pointerleave'])$('stage').addEventListener(event,()=>{drag=null;$('movingLayer').classList.remove('dragging')});
+$('saveRelative').onclick=async()=>{try{const ref=activeSource('referencePair','referenceSource'),target=activeSource('targetPair','targetSource');const result=await api('/api/calibration/relative',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reference_pair:$('referencePair').value,reference_source:ref.kind,target_pair:$('targetPair').value,target_source:target.kind,stage_transform:matrix(),stage_size:stageSize})});$('calibrationStatus').textContent=`Saved ${result.target_key}; reference composition complete.`}catch(e){$('calibrationStatus').textContent=e.message}};
+$('savePoints').onclick=async()=>{try{const body=JSON.parse($('points').value);body.pair=$('pointPair').value;body.source=$('pointSource').value;const r=await api('/api/calibration/homography',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});$('calibrationStatus').textContent='Anchor saved. RMS reprojection error: '+r.rms.toFixed(2)+' px'}catch(e){$('calibrationStatus').textContent=e.message}};
 status();scans();setInterval(scans,10000);setInterval(()=>{if(mode==='bench')document.querySelectorAll('.feed').forEach(i=>i.src=i.src.split('?')[0]+'?t='+Date.now())},1000);
 </script></body></html>"""
 
@@ -117,6 +127,19 @@ def thermal_preview(frame, thermal_range):
     return image
 
 
+def source_size(source):
+    return (2304, 1296) if source == "visible" else (32, 24)
+
+
+def to_canvas_key(source):
+    return f"{source}_to_canvas"
+
+
+def scale_to_stage(source, stage_size):
+    width, height = source_size(source)
+    return np.array([[stage_size[0] / width, 0, 0], [0, stage_size[1] / height, 0], [0, 0, 1]], dtype=np.float64)
+
+
 def create_app(mode):
     app = Flask(__name__)
     layout = load_json(LAYOUT_PATH)
@@ -143,13 +166,25 @@ def create_app(mode):
 
     @app.get("/api/status")
     def status():
+        thermal_indexes = {
+            source.get("pair_name"): index
+            for index, (source, _sensor) in enumerate(bench.thermals)
+            if source.get("pair_name")
+        } if bench else {}
         return jsonify({
             "mode": mode,
             "message": startup_error or ("Hardware preview ready" if bench else "Inspection artifact viewer ready"),
             "calibrated": bool(layout.get("calibrated")),
             "visible": list(bench.cameras) if bench else [],
             "thermal": [source for source, _sensor in bench.thermals] if bench else [],
-            "pairs": [{"name": pair["name"]} for pair in layout.get("pairs", [])],
+            "pairs": [
+                {
+                    "name": pair["name"],
+                    "visible_camera_index": pair["visible_camera_index"],
+                    "bench_thermal_index": thermal_indexes.get(pair["name"]),
+                }
+                for pair in layout.get("pairs", [])
+            ],
         })
 
     @app.get("/api/preview/visible/<int:index>.jpg")
@@ -209,6 +244,36 @@ def create_app(mode):
         with LAYOUT_PATH.open("w", encoding="utf-8") as destination:
             json.dump(layout, destination, indent=2)
         return jsonify(rms=rms)
+
+    @app.post("/api/calibration/relative")
+    def save_relative_transform():
+        body = request.get_json(silent=True) or {}
+        reference = next((pair for pair in layout.get("pairs", []) if pair["name"] == body.get("reference_pair")), None)
+        target = next((pair for pair in layout.get("pairs", []) if pair["name"] == body.get("target_pair")), None)
+        reference_source = body.get("reference_source")
+        target_source = body.get("target_source")
+        stage_transform = np.asarray(body.get("stage_transform"), dtype=np.float64)
+        stage_size = body.get("stage_size")
+        if reference is None or target is None or reference_source not in {"visible", "thermal"} or target_source not in {"visible", "thermal"}:
+            return jsonify(error="Select known reference and target pair sources"), 400
+        if stage_transform.shape != (3, 3) or not np.isfinite(stage_transform).all() or np.isclose(stage_transform[2, 2], 0):
+            return jsonify(error="Stage transform must be a finite 3x3 matrix"), 400
+        if not isinstance(stage_size, list) or len(stage_size) != 2 or any(not isinstance(value, (int, float)) or value <= 0 for value in stage_size):
+            return jsonify(error="Stage size must contain positive width and height"), 400
+        reference_transform = reference.get(to_canvas_key(reference_source))
+        if reference_transform is None:
+            return jsonify(error=f"Anchor {reference['name']} {reference_source} to the shared canvas before relative registration"), 400
+        reference_transform = np.asarray(reference_transform, dtype=np.float64)
+        if reference_transform.shape != (3, 3) or not np.isfinite(reference_transform).all():
+            return jsonify(error="Reference canvas transform is invalid"), 400
+
+        # Browser transform is target-stage -> reference-stage. Convert it to target pixels -> canvas pixels.
+        target_transform = reference_transform @ np.linalg.inv(scale_to_stage(reference_source, stage_size)) @ stage_transform @ scale_to_stage(target_source, stage_size)
+        target[to_canvas_key(target_source)] = (target_transform / target_transform[2, 2]).tolist()
+        layout["calibrated"] = False
+        with LAYOUT_PATH.open("w", encoding="utf-8") as destination:
+            json.dump(layout, destination, indent=2)
+        return jsonify(target_key=to_canvas_key(target_source), transform=target[to_canvas_key(target_source)])
 
     @app.get("/api/scans")
     def scans():

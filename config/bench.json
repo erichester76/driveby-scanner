@@ -3,6 +3,7 @@
   "thermal_sources": [
     {
       "name": "direct-thermal",
+      "pair_name": "left",
       "kind": "direct"
     }
   ]

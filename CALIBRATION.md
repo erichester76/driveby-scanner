@@ -34,6 +34,23 @@ Keep a calibrated target image and transform-generation record with the
 installation. Recalibrate after changing camera positions, focus, sensor
 orientation, or the imaging-plane height.
 
+## Browser Registration Workbench
+
+The bench console has two transform workflows:
+
+- Use matched points to anchor the first visible or thermal source to the
+  shared canvas. This is required because the browser has no knowledge of the
+  physical canvas position.
+- Once an anchored reference exists, use the relative-registration workbench to
+  drag, scale, rotate, and blend a moving source over it. Saving composes the
+  browser transform with the reference's canvas homography and writes the
+  target source transform.
+
+Map bench thermal sources to their physical pair with `pair_name` in
+`config/bench.json`. Only mapped thermal sources can be used in the drag
+workbench. The display is for fine adjustment; verify the transform with the
+calibration target and record the result before setting `calibrated: true`.
+
 ## Coverage And Speed
 
 Set `inspection_roi` to the vehicle area a technician must review. Set coverage
