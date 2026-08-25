@@ -202,6 +202,8 @@ def save_layout(layout):
 
 def matrix_or_none(values):
     matrix = np.asarray(values, dtype=np.float64)
+    if matrix.shape == (9,):
+        matrix = matrix.reshape(3, 3)
     if matrix.shape != (3, 3) or not np.isfinite(matrix).all() or abs(np.linalg.det(matrix)) < 1e-9:
         return None
     return matrix / matrix[2, 2]
@@ -500,7 +502,9 @@ def create_app(mode):
             saved = {}
             for record in records:
                 pair = next(item for item in persisted["pairs"] if item["name"] == record["pair"])
-                saved[f"{record['pair']}:{record['source']}"] = pair[source_key(record["source"])]
+                saved[f"{record['pair']}:{record['source']}"] = np.asarray(
+                    pair[source_key(record["source"])], dtype=np.float64
+                ).reshape(-1).tolist()
             layout = persisted
             return jsonify(
                 count=len(records),
