@@ -14,7 +14,7 @@
 ## Hardware Constraints
 
 - `config/inspection_layout.json` explicitly pairs visible source descriptors (`picamera2` CSI/HAT indexes or `v4l2` USB device paths) with TCA9548A channels, and holds every calibrated transform. Keep it `calibrated: false` until all transforms and coverage thresholds are measured; the application must refuse to emit an uncalibrated inspection image.
-- `CALIBRATION.md` defines transform, coverage, and speed-limit requirements. Recalibrate after a camera, sensor, focus, orientation, or mounting-height change.
+- `docs/CALIBRATION.md` defines transform, coverage, and speed-limit requirements. Recalibrate after a camera, sensor, focus, orientation, or mounting-height change.
 - MLX90640 sensors share an I2C address and must remain behind the TCA9548A. Thermal frames are 32x24 and the current setup uses channels `0` and `1` at 4 Hz.
 - `adafruit_mlx90640.MLX90640.getFrame` requires a flat 768-value buffer; reshape it to 32x24 only after acquisition.
 - The RCWL-0516 is presence-only. Traversal speed is measured from the calibrated motion camera; passes exceeding the configured speed, frame displacement, visible/thermal skew, or coverage limits are rejected.

@@ -1,238 +1,87 @@
-# Undercarriage EV Inspection System
+# Drive-Over Undercarriage Scanner
 
-Portable drive-over undercarriage inspection system designed for EV service bays and Supercharger locations. The system captures visible and thermal imagery of the vehicle underbody (battery pack, cooling lines, brakes, bearings, etc.) as the car drives over a low-profile modular ramp.
+A Raspberry Pi-based visible and thermal scanner for capturing a vehicle's
+undercarriage as it drives over a calibrated sensor strip. It is currently a
+hardware-dependent prototype for Raspberry Pi OS Bookworm hosts.
 
-**Current Status:** Phase 1 Prototype
+## What You Need
 
----
+- 64-bit Raspberry Pi OS Bookworm with Docker Compose.
+- Connected CSI or V4L2 visible cameras, MLX90640 thermal sensors, and I2C.
+- The optional RCWL-0516 presence sensor on BCM GPIO17.
+- A completed, reviewed calibration before deployed capture.
 
-## Goals
+The application needs live cameras, GPIO, and I2C. It is not a host-only smoke
+test. The container runs privileged and maps the hardware devices declared in
+`docker-compose.yml`.
 
-| Phase | Goal |
-|-------|------|
-| **Phase 1** (current) | Capture visible + thermal images and create a basic combined overlay for technician review |
-| **Phase 2** | Improve image stitching and add automatic issue detection |
-| **Phase 3** | Deploy as a portable unit for free inspections at Superchargers to generate repair business |
+## Quick Start
 
----
-
-## Hardware Overview
-
-### Design References
-
-- [`CAMERA_PLACEMENT.md`](CAMERA_PLACEMENT.md): low-strip placement, optional
-  static side views, ramp layouts, and deployment coverage limits.
-- [`APPROACH_LIGHTING.md`](APPROACH_LIGHTING.md): unattended dynamic-deployment
-  approach mat and leading-edge lighting behavior.
-
-### Mechanical
-- **3 × VEVOR 2-Channel Cable Protectors** (39.57" × 9.45" × 1.77")
-  Joined end-to-end across the vehicle, they form a 3,015 mm-wide by 240 mm-deep
-  low-profile platform. The central 2,010 mm is the marked drive corridor; the
-  approximately 500 mm outer wings are reserved for protected future side
-  modules, not normal driving.
-- **Shared low-strip sensor tray** (planned)
-  A rigid, removable tray occupies the protected inboard area. Individual
-  visible and thermal sensor pods mount on fixed-angle wedges inside it; the
-  VEVOR troughs route cables and drain water. The pods are serviceable and are
-  not structural or epoxy-potted.
-
-### Compute
-- **Raspberry Pi 5 (8GB)**
-  Main controller. Handles camera capture, GPIO, and processing.
-
-### Cameras
-| Type | Model | Qty | Notes |
-|------|-------|-----|-------|
-| Visible | Arducam Camera Module 3 Wide (IMX708) | 3 planned | Wide FOV, autofocus; left, center, and right fixed-strip views. The current center source is a USB-camera deployment template. |
-| Thermal | MLX90640-D110 | 3 planned | 32×24, wide FOV, I2C through TCA9548A channels 0, 1, and 2. |
-
-The low-strip design keeps the center pair vertical and tilts left/right pairs
-outward to cover outer underbody, inboard wheel/brake, and suspension zones.
-Final positions, tilt wedges, and all source-to-strip transforms require
-physical validation and calibration.
-
-### Lighting
-- IP68 Waterproof COB LED Strip (12V, 6000K, high CRI)
-- 12V 60W Waterproof Power Supply
-- Dual MOSFET modules for GPIO-controlled switching
-- Dedicated diffused addressable RGBW leading-edge strip (planned) for scanner
-  availability, approach, scan, completion, and ready states. This is separate
-  from the white undercarriage illumination and is dimmed or off during capture.
-- Thin retroreflective approach mat (planned), 8-10 ft before the scanner, with
-  `VEHICLE SCAN`, `SLOW`, `CENTER WHEELS`, and tapered wheel-path guides.
-
-### Sensing & Control
-- **RCWL-0516** Microwave radar sensor – vehicle detection
-- **TCA9548A** I2C multiplexer – allows multiple MLX90640 sensors on one bus
-- Hookup wire kit
-
----
-
-## Deployment Profiles
-
-### Dynamic Portable Deployment
-
-For events, Superchargers, and unattended facility entrances, the scanner stays
-low-profile and uses the inboard three-pair strip. It is intended to inspect the
-central underbody, battery edges, inboard suspension, and inner brake heat. It
-records coverage quality rather than claiming full tire, wheel-face, side, or
-roof inspection from the low strip alone.
-
-The approach mat and leading-edge RGBW strip make the unit read as an active
-inspection station rather than a speed bump. The intended light-state sequence
-is idle -> amber approach -> scanning -> red completion -> green ready sweep.
-
-### Static Service-Bay Deployment
-
-A fixed bay may reuse the same low strip and add protected elevated side pods
-or arches. Those optional modules provide supplemental wheel-face, outer tire
-shoulder, outer brake, rocker, body, and roofline views. Outboard thermal views
-are supplemental hotspot detectors; they do not replace low inboard thermal
-views of wheel/brake hardware.
-
-See [`CAMERA_PLACEMENT.md`](CAMERA_PLACEMENT.md) and
-[`APPROACH_LIGHTING.md`](APPROACH_LIGHTING.md) for geometry, physical assembly,
-and driver-facing behavior.
-
----
-
-## Software Architecture (Phase 1)
-
-The main script (`app/main.py`) performs the following sequence:
-
-1. Continuously monitors the RCWL-0516 radar
-2. When a vehicle is detected:
-   - Turns on the LED strip
-   - Captures calibrated visible/thermal pairs while a vehicle crosses the scanner
-3. When capture is complete:
-   - Turns off the LEDs
-   - Rejects insufficiently sampled or registered passes, otherwise writes one calibrated inspection mosaic
-4. Returns to waiting for the next vehicle
-
-### Key Features of the Script
-- Explicit visible-camera/TCA-channel pairing in `config/inspection_layout.json`
-- Fixed side-by-side sensor strip placed repeatedly along vehicle travel into one underbody canvas
-- Fixed Celsius heatmap scale, temperature array, coverage mask, and capture metadata
-- Motion-derived speed validation so passes with gaps are rejected rather than stitched incorrectly
-- All inspection artifacts saved with timestamps in `/captures`
-
-### Calibration And Speed Limits
-
-`config/inspection_layout.json` is intentionally shipped with `"calibrated": false`, so the scanner will not create uncalibrated inspection images. Hardware engineers must populate it before deployment:
-
-- `pairs` explicitly maps a visible source descriptor to a TCA9548A channel. Add a third center pair as another object; do not rely on matching indexes.
-- `visible_to_strip` and `thermal_to_strip` are each pair's 3x3 homographies into the fixed cross-car sensor strip.
-- `motion_to_canvas` converts phase-correlation movement from the selected motion camera into canvas pixels, including direction and scale.
-- `strip` defines the fixed union of side-by-side camera fields. `canvas` and `inspection_roi` define the final full-underbody extent as successive strips are placed along travel.
-- `max_traversal_speed_mps` and `max_motion_step_pixels` reject a pass when consecutive samples cannot cover the canvas without a gap.
-
-The RCWL-0516 is presence-only; it cannot report vehicle speed. The application estimates speed from registered camera motion and records average and maximum speed in each event's metadata JSON.
-
-See [`CALIBRATION.md`](CALIBRATION.md) for the required transform, coverage, and speed-limit measurements.
-
----
-
-## Docker Deployment
-
-Build and run on a 64-bit Raspberry Pi OS Bookworm host. The image starts from
-official Debian Bookworm and adds Raspberry Pi's official APT archive because
-`Picamera2` and its matching `libcamera` stack are not available from upstream
-Debian. Compiled imaging packages are installed with `apt` to keep their NumPy
-ABI compatible.
+Build and start the browser bench console:
 
 ```bash
-docker compose build
-docker compose up
+docker compose up --build
 ```
 
-## Bench And Viewer Console
+Open `http://<pi-address>:8080`.
 
-The default `SCANNER_MODE=bench` starts a browser console at
-`http://<pi-address>:8080`. It opens only the sources listed in
-`config/bench.json`, so use the shipped direct-I2C thermal entry for initial
-one-sensor bench work without the TCA9548A, radar, or LEDs.
+The default mode is `bench`. It previews only sources named in
+`config/bench.json` and never begins deployed capture.
 
-The direct MLX90640 test must be the only same-address thermal sensor connected
-to the Pi I2C bus. When the TCA9548A is installed, replace the direct source in
-`config/bench.json` with one or more `"kind": "tca9548a"` sources and their
-channels.
+## Runtime Modes
 
-The committed bench configuration is the multiplexer setup: left, right, and
-center thermal sources use TCA9548A channels `0`, `1`, and `2`. Do not use it
-for the earlier single direct-connected MLX90640 test without changing the
-thermal source back to `"kind": "direct"`.
+| Mode | Command | Purpose |
+| --- | --- | --- |
+| Bench | `docker compose up` | Live hardware preview, snapshots, and calibration. |
+| Viewer | `SCANNER_MODE=viewer docker compose up` | Browse saved artifacts without opening hardware. |
+| Deployed | `SCANNER_MODE=deployed docker compose up` | Radar-triggered inspection capture. |
 
-Both `visible_sources` and `thermal_sources` in `config/bench.json` are named
-and explicitly mapped to their `Picamera2` indexes or TCA9548A channels. A
-thermal source with no matching deployed `pairs` entry can be previewed, but it
-cannot be registered or included in a deployed mosaic until its matching
-visible-camera pair is added to `config/inspection_layout.json`.
+Do not run bench and deployed modes together: both open the camera hardware.
 
-Visible sources support either CSI/HAT-managed cameras or USB UVC cameras:
+## Configure Sources
 
-```json
-{
-  "kind": "picamera2",
-  "index": 0,
-  "size": [2304, 1296]
-}
-```
+`config/bench.json` controls bench previews. Visible and thermal sources are
+explicitly named and paired; do not infer a pair from list order.
 
-```json
-{
-  "kind": "v4l2",
-  "device": "/dev/v4l/by-id/usb-your-camera-video-index0",
-  "size": [1920, 1080]
-}
-```
+`config/inspection_layout.json` controls deployed capture. It maps every
+visible source to one TCA9548A thermal channel and stores the calibration
+transforms. The shipped layout is deliberately uncalibrated.
 
-Use the stable `/dev/v4l/by-id/...` path in configuration. Docker must also
-pass through the corresponding resolved `/dev/videoX` device in
-`docker-compose.yml`. Use `v4l2-ctl --list-devices` and `ls -l
-/dev/v4l/by-id/` on the Pi to identify both paths.
+The current layout reserves the center pair for thermal channel `2` and a USB
+visible camera. Before deployment, replace
+`/dev/v4l/by-id/REPLACE_WITH_CENTER_CAMERA` with the stable by-id device path
+and add its resolved `/dev/videoX` device to `docker-compose.yml`.
 
-The shipped `center` deployment pair is a USB-camera template for TCA channel
-`2`. Replace its `device` value with the discovered stable by-id path and add
-the matching `/dev/videoX` mapping before setting the layout calibrated.
+The mounted `config/` and `captures/` directories persist configuration and
+inspection artifacts outside the container.
 
-To show the optional RCWL-0516 status in the bench console, wire `OUT` to BCM
-GPIO17 (physical pin 11). The committed bench configuration enables this input.
-The indicator reports presence only; it does not start an inspection capture.
+## Calibrate Before Deployment
 
-For a direct thermal bench test outside Docker, install Blinka's Raspberry Pi
-GPIO backend with `sudo apt install -y python3-lgpio`. The Docker image already
-includes this package.
+The scanner refuses to create deployed inspection mosaics until
+`config/inspection_layout.json` is reviewed and marked with
+`"calibrated": true`.
 
-The console provides live visible and thermal previews, saves bench snapshots,
-offers automated visible-lens calibration, and lists deployed inspection
-mosaics. Saving any calibration never enables deployed capture: it keeps
-`calibrated: false` until all values are reviewed.
+Use the bench console to:
 
-The fixed sensor strip editor is the calibration view for final transforms: it
-renders available sources in the fixed cross-car strip, rectifying a source when
-its intrinsics have been configured. Select a layer to move, scale, rotate, or
-flip it, then use Save strip layout to write source-to-strip transforms
-atomically. Deployed capture places successive calibrated strips along vehicle
-travel to create the full underbody image.
+1. Verify every visible and thermal source.
+2. Calibrate each visible lens with the checkerboard workflow.
+3. Place visible and thermal fields into the fixed strip editor.
+4. Calibrate motion with a known-distance pass.
+5. Review coverage and speed limits, then enable the layout.
 
-Each bench preview has a monotonic timestamp and sequence number. They must
-advance while the page is open; if they advance while the physical scene stays
-unchanged, the browser is receiving new responses and the problem is upstream
-of browser caching.
+See [Calibration](docs/CALIBRATION.md) for the complete procedure.
 
-MLX90640 reads are stored as 32x24 Celsius arrays after acquisition. The
-underlying Adafruit driver requires a flat 768-value buffer, so do not pass it a
-pre-shaped 32x24 array when adding thermal capture code.
+## Inspection Output
 
-Use viewer-only mode when the deployed scanner process owns the hardware:
+Each accepted deployed pass writes timestamped artifacts to `captures/`,
+including the visible mosaic, thermal data, coverage mask, and metadata. Passes
+that exceed configured movement, speed, source-skew, sharpness, or coverage
+limits are rejected rather than stitched into a misleading inspection.
 
-```bash
-SCANNER_MODE=viewer docker compose up
-```
+## Documentation
 
-Run unattended capture only after calibration:
-
-```bash
-SCANNER_MODE=deployed docker compose up
-```
+- [System design](docs/SYSTEM_DESIGN.md): platform, sensor-strip, and deployment architecture.
+- [Camera placement](docs/CAMERA_PLACEMENT.md): placement targets, tilt, ramp geometry, and optional side views.
+- [Approach lighting](docs/APPROACH_LIGHTING.md): approach mat and driver-facing light states.
+- [Calibration](docs/CALIBRATION.md): required visible, thermal, strip, and motion calibration.
+- [Repository guidance](AGENTS.md): hardware and runtime constraints for contributors.
