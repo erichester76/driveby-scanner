@@ -630,7 +630,8 @@ def create_app(mode):
             source = next((item for item in available_sources() if item["pair"] == session["pair_name"] and item["source"] == "visible"), None)
             if pair is None or source is None or not source["available"]:
                 return jsonify(error="Selected visible pair is not available in bench mode"), 400
-        frame, _rectified = rectify(bench.visible(source["index"]), pair, "visible")
+        # Lens calibration estimates the raw source's distortion; never pre-undistort it.
+        frame = bench.visible(source["index"])
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         found, corners = cv2.findChessboardCornersSB(gray, session["pattern"], flags=cv2.CALIB_CB_NORMALIZE_IMAGE)
         if not found:
@@ -642,6 +643,8 @@ def create_app(mode):
             session["image_size"] = (gray.shape[1], gray.shape[0])
         elif session["image_size"] != (gray.shape[1], gray.shape[0]):
             return jsonify(error="Visible source resolution changed during collection"), 400
+        if session["corners"] and np.mean(np.linalg.norm(corners - session["corners"][-1], axis=2)) < 8:
+            return jsonify(error="Checkerboard pose is too similar to the previous view; move or tilt it and retry"), 400
         session["corners"].append(corners.astype(np.float32))
         return jsonify(views=len(session["corners"]), coverage=coverage)
 

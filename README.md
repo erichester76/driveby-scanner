@@ -153,15 +153,16 @@ GPIO backend with `sudo apt install -y python3-lgpio`. The Docker image already
 includes this package.
 
 The console provides live visible and thermal previews, saves bench snapshots,
-supports point anchoring plus drag/scale/rotate relative registration, and
-lists deployed inspection mosaics. Saving a transform never enables deployed capture: it keeps
-`calibrated: false` until all calibration values are reviewed.
+offers automated visible-lens calibration, and lists deployed inspection
+mosaics. Saving any calibration never enables deployed capture: it keeps
+`calibrated: false` until all values are reviewed.
 
-The corrected multi-layer canvas is the calibration view for final transforms:
-it renders all available sources in the deployed shared canvas coordinate
-system, rectifying a source when its intrinsics have been configured. Select a
-layer on the canvas to move, scale, rotate, or flip it, then use Save All to
-write all directly placed source-to-canvas transforms atomically.
+The fixed sensor strip editor is the calibration view for final transforms: it
+renders available sources in the fixed cross-car strip, rectifying a source when
+its intrinsics have been configured. Select a layer to move, scale, rotate, or
+flip it, then use Save strip layout to write source-to-strip transforms
+atomically. Deployed capture places successive calibrated strips along vehicle
+travel to create the full underbody image.
 
 Each bench preview has a monotonic timestamp and sequence number. They must
 advance while the page is open; if they advance while the physical scene stays
