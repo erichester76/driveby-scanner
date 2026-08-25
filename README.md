@@ -18,6 +18,13 @@ Portable drive-over undercarriage inspection system designed for EV service bays
 
 ## Hardware Overview
 
+### Design References
+
+- [`CAMERA_PLACEMENT.md`](CAMERA_PLACEMENT.md): low-strip placement, optional
+  static side views, ramp layouts, and deployment coverage limits.
+- [`APPROACH_LIGHTING.md`](APPROACH_LIGHTING.md): unattended dynamic-deployment
+  approach mat and leading-edge lighting behavior.
+
 ### Mechanical
 - **2 × VEVOR 2-Channel Cable Protectors** (39.6" × 9.45" × 1.77")
   Used as the low-profile drive-over enclosure. Two units placed side-by-side create an approximately 50" imaging strip between the vehicle tires.
