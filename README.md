@@ -26,8 +26,16 @@ Portable drive-over undercarriage inspection system designed for EV service bays
   approach mat and leading-edge lighting behavior.
 
 ### Mechanical
-- **2 × VEVOR 2-Channel Cable Protectors** (39.6" × 9.45" × 1.77")
-  Used as the low-profile drive-over enclosure. Two units placed side-by-side create an approximately 50" imaging strip between the vehicle tires.
+- **3 × VEVOR 2-Channel Cable Protectors** (39.57" × 9.45" × 1.77")
+  Joined end-to-end across the vehicle, they form a 3,015 mm-wide by 240 mm-deep
+  low-profile platform. The central 2,010 mm is the marked drive corridor; the
+  approximately 500 mm outer wings are reserved for protected future side
+  modules, not normal driving.
+- **Shared low-strip sensor tray** (planned)
+  A rigid, removable tray occupies the protected inboard area. Individual
+  visible and thermal sensor pods mount on fixed-angle wedges inside it; the
+  VEVOR troughs route cables and drain water. The pods are serviceable and are
+  not structural or epoxy-potted.
 
 ### Compute
 - **Raspberry Pi 5 (8GB)**
@@ -36,20 +44,56 @@ Portable drive-over undercarriage inspection system designed for EV service bays
 ### Cameras
 | Type | Model | Qty | Notes |
 |------|-------|-----|-------|
-| Visible | Arducam Camera Module 3 Wide (IMX708) | 2 | ~120° FOV, autofocus, CSI |
-| Thermal | MLX90640-D110 | 2 | 32×24 resolution, 110° FOV, I2C |
+| Visible | Arducam Camera Module 3 Wide (IMX708) | 3 planned | Wide FOV, autofocus; left, center, and right fixed-strip views. The current center source is a USB-camera deployment template. |
+| Thermal | MLX90640-D110 | 3 planned | 32×24, wide FOV, I2C through TCA9548A channels 0, 1, and 2. |
 
-> Starting with 2 visible + 2 thermal cameras. Designed for easy expansion to 3+3 later.
+The low-strip design keeps the center pair vertical and tilts left/right pairs
+outward to cover outer underbody, inboard wheel/brake, and suspension zones.
+Final positions, tilt wedges, and all source-to-strip transforms require
+physical validation and calibration.
 
 ### Lighting
 - IP68 Waterproof COB LED Strip (12V, 6000K, high CRI)
 - 12V 60W Waterproof Power Supply
 - Dual MOSFET modules for GPIO-controlled switching
+- Dedicated diffused addressable RGBW leading-edge strip (planned) for scanner
+  availability, approach, scan, completion, and ready states. This is separate
+  from the white undercarriage illumination and is dimmed or off during capture.
+- Thin retroreflective approach mat (planned), 8-10 ft before the scanner, with
+  `VEHICLE SCAN`, `SLOW`, `CENTER WHEELS`, and tapered wheel-path guides.
 
 ### Sensing & Control
 - **RCWL-0516** Microwave radar sensor – vehicle detection
 - **TCA9548A** I2C multiplexer – allows multiple MLX90640 sensors on one bus
 - Hookup wire kit
+
+---
+
+## Deployment Profiles
+
+### Dynamic Portable Deployment
+
+For events, Superchargers, and unattended facility entrances, the scanner stays
+low-profile and uses the inboard three-pair strip. It is intended to inspect the
+central underbody, battery edges, inboard suspension, and inner brake heat. It
+records coverage quality rather than claiming full tire, wheel-face, side, or
+roof inspection from the low strip alone.
+
+The approach mat and leading-edge RGBW strip make the unit read as an active
+inspection station rather than a speed bump. The intended light-state sequence
+is idle -> amber approach -> scanning -> red completion -> green ready sweep.
+
+### Static Service-Bay Deployment
+
+A fixed bay may reuse the same low strip and add protected elevated side pods
+or arches. Those optional modules provide supplemental wheel-face, outer tire
+shoulder, outer brake, rocker, body, and roofline views. Outboard thermal views
+are supplemental hotspot detectors; they do not replace low inboard thermal
+views of wheel/brake hardware.
+
+See [`CAMERA_PLACEMENT.md`](CAMERA_PLACEMENT.md) and
+[`APPROACH_LIGHTING.md`](APPROACH_LIGHTING.md) for geometry, physical assembly,
+and driver-facing behavior.
 
 ---
 
@@ -100,6 +144,7 @@ ABI compatible.
 ```bash
 docker compose build
 docker compose up
+```
 
 ## Bench And Viewer Console
 
