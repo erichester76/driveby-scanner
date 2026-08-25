@@ -11,7 +11,7 @@
     "origin_in_canvas": [0, 0]
   },
   "motion_pair_name": "left",
-  "motion_roi": [512, 512, 3072, 3072],
+  "motion_roi": [230, 130, 1844, 1036],
   "motion_to_canvas": null,
   "min_motion_response": 0.2,
   "max_motion_step_pixels": 100,

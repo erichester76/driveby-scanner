@@ -28,7 +28,7 @@ PAGE = """<!doctype html>
 <header><div><div class="mode" id="mode"></div><h1>Undercarriage Scan Console</h1></div><div class="status" id="status">Connecting...</div></header>
 <div class="notice" id="notice"></div>
 <section id="bench"><div class="controls"><div class="radar" id="radarIndicator">Radar: not wired</div><button id="snapshot">Save bench snapshot</button><button class="secondary" id="toggle">Open strip editor</button></div><div class="grid" id="feeds"></div>
-<div class="panel calibration" id="calibration"><h2>Fixed Sensor Strip Editor</h2><p class="help"><strong>Build the scanner light bar:</strong> align left, center, and right sources into one fixed cross-car strip with only their measured overlap. This saves fixed <code>source -> strip</code> geometry. During a pass, the car moves over this fixed strip, so each captured strip is placed farther along the travel axis to create the complete underbody image.</p><div class="workspace"><div><div class="layers" id="layers"></div><div class="canvas-wrap"><canvas id="mosaicCanvas"></canvas></div></div><aside><h2 id="selectedTitle">Select a layer</h2><div class="controls"><label>Opacity <input id="alpha" type="range" min="0.1" max="1" value="0.6" step="0.05"></label><label>Scale <input id="scale" type="range" min="0.5" max="1.8" value="1" step="0.005"></label><label>Rotation <input id="rotation" type="range" min="-30" max="30" value="0" step="0.1"></label></div><div class="controls"><button class="secondary" id="flipHorizontal">Flip horizontal</button><button class="secondary" id="flipVertical">Flip vertical</button></div><div class="controls"><button class="secondary" id="resetLayer">Reset layer</button><button id="saveAll">Save strip layout</button></div><div class="readout" id="transformReadout"></div><p class="help">A <code>raw</code> source has no lens coefficients yet. Direct placement still saves its strip position, but calibrate lens coefficients before trusting the final geometric alignment.</p><span class="status" id="calibrationStatus"></span></aside></div></div></section>
+<div class="panel calibration" id="calibration"><h2>Fixed Sensor Strip Editor</h2><p class="help"><strong>Build the scanner light bar:</strong> align left, center, and right sources into one fixed cross-car strip with only their measured overlap. This saves fixed <code>source -> strip</code> geometry. During a pass, the car moves over this fixed strip, so each captured strip is placed farther along the travel axis to create the complete underbody image.</p><div class="workspace"><div><div class="layers" id="layers"></div><div class="canvas-wrap"><canvas id="mosaicCanvas"></canvas></div></div><aside><h2 id="selectedTitle">Select a layer</h2><div class="controls"><label>Opacity <input id="alpha" type="range" min="0.1" max="1" value="0.6" step="0.05"></label><label>Scale <input id="scale" type="range" min="0.5" max="1.8" value="1" step="0.005"></label><label>Rotation <input id="rotation" type="range" min="-30" max="30" value="0" step="0.1"></label></div><div class="controls"><button class="secondary" id="flipHorizontal">Flip horizontal</button><button class="secondary" id="flipVertical">Flip vertical</button></div><div class="controls"><button class="secondary" id="resetLayer">Reset layer</button><button id="saveAll">Save strip layout</button></div><div class="readout" id="transformReadout"></div><p class="help">A <code>raw</code> source has no lens coefficients yet. Direct placement still saves its strip position, but calibrate lens coefficients before trusting the final geometric alignment.</p><span class="status" id="calibrationStatus"></span></aside></div><div class="panel"><h2>Motion Calibration</h2><p class="help">Place a high-contrast target on a flat surface, move it through the selected motion camera field by the measured distance, and record the controlled pass. This establishes how camera-pixel movement becomes final-canvas travel. It does not use the radar.</p><div class="controls"><label>Motion pair <select id="motionPair"></select></label><label>Known target travel (m) <input id="motionDistance" type="number" value="1" min="0.1" step="0.01"></label><label>Record duration (s) <input id="motionDuration" type="number" value="4" min="1" max="15" step="0.5"></label><label>Canvas direction <select id="motionDirection"><option value="1">Down</option><option value="-1">Up</option></select></label><button id="recordMotion">Record test pass</button><button class="secondary" id="saveMotion" disabled>Save motion calibration</button></div><label><input id="applyMotionLimits" type="checkbox"> Apply recommended maximum step and speed limits</label><div class="readout" id="motionResult">Record a known-distance pass to calculate motion_to_canvas.</div></div></div></section>
 <section><h2>Technician inspections</h2><div class="scans" id="scans"></div></section>
 </main><script>
 const mode={{ mode|tojson }};let info={},layers=[],selectedId=null,drag=null,canvasScale=1,revision=null;
@@ -51,7 +51,7 @@ function setupLayers(){layers=info.sources.filter(s=>s.available).map(s=>{const 
 function applyDelta(delta){const layer=selected();if(!layer)return;const [x,y]=center(layer);layer.matrix=normalize(multiply(around(x,y,delta),layer.matrix));renderCanvas()}
 function preview(kind,index){return kind==='visible'?`/api/preview/visible.jpg?source_id=${encodeURIComponent(index)}`:`/api/preview/thermal/${index}.jpg`}
 function renderRadar(radar){const e=$('radarIndicator');e.textContent=radar.enabled?(radar.detected?`Radar: vehicle detected (GPIO ${radar.raw_value})`:`Radar: clear (GPIO ${radar.raw_value})`):'Radar: not wired';e.classList.toggle('active',Boolean(radar.detected))}
-async function status(initial=false){try{info=await api('/api/status');revision=info.revision;$('mode').textContent=info.mode;$('status').textContent=info.message;$('notice').textContent=info.calibrated?'Calibration is marked active. Review artifacts and coverage before unattended operation.':'Bench mode is safe for uncalibrated hardware. Deployed capture refuses to emit uncalibrated inspection images.';renderRadar(info.radar);if(mode==='bench'&&initial){$('feeds').innerHTML=info.visible.map(s=>feed('visible',s.source_id,s.name)).join('')+info.thermal.map((s,i)=>feed('thermal',i,s.name+' thermal',true)).join('');setupLayers();refreshPreviews()}else if(mode!=='bench')$('bench').hidden=true}catch(e){$('status').textContent=e.message}}
+async function status(initial=false){try{info=await api('/api/status');revision=info.revision;$('mode').textContent=info.mode;$('status').textContent=info.message;$('notice').textContent=info.calibrated?'Calibration is marked active. Review artifacts and coverage before unattended operation.':'Bench mode is safe for uncalibrated hardware. Deployed capture refuses to emit uncalibrated inspection images.';renderRadar(info.radar);if(mode==='bench'&&initial){$('feeds').innerHTML=info.visible.map(s=>feed('visible',s.source_id,s.name)).join('')+info.thermal.map((s,i)=>feed('thermal',i,s.name+' thermal',true)).join('');$('motionPair').innerHTML=info.motion_pairs.map(p=>`<option value="${p}">${p}</option>`).join('');$('motionPair').value=info.motion_pair_name||info.motion_pairs[0]||'';setupLayers();refreshPreviews()}else if(mode!=='bench')$('bench').hidden=true}catch(e){$('status').textContent=e.message}}
 async function scans(){try{const data=await api('/api/scans');$('scans').innerHTML=data.scans.length?data.scans.map(s=>`<article class="scan"><a href="/captures/${s.image}" target="_blank"><img src="/captures/${s.image}" loading="lazy"><strong>${s.event_id}</strong></a><div class="status">${s.stats}</div></article>`).join(''):'<p class="status">No deployed inspection mosaics yet.</p>'}catch(e){$('scans').textContent=e.message}}
 async function refreshPreview(image){if(image.dataset.loading)return;image.dataset.loading='1';try{const r=await fetch(preview(image.dataset.previewKind,image.dataset.previewIndex),{cache:'no-store'});if(!r.ok)throw Error(`Preview HTTP ${r.status}`);const url=URL.createObjectURL(await r.blob()),previous=image.dataset.objectUrl;image.src=url;image.dataset.objectUrl=url;if(previous)URL.revokeObjectURL(previous)}catch(e){image.alt=e.message}finally{delete image.dataset.loading}}
 function refreshPreviews(){document.querySelectorAll('.feed[data-preview-kind]').forEach(refreshPreview)}
@@ -59,6 +59,7 @@ $('snapshot').onclick=async()=>{try{const r=await api('/api/snapshot',{method:'P
 $('mosaicCanvas').addEventListener('pointerdown',e=>{const box=e.currentTarget.getBoundingClientRect(),x=(e.clientX-box.left)/canvasScale,y=(e.clientY-box.top)/canvasScale;for(const layer of [...layers].reverse()){const inv=inverse(layer.matrix);if(!inv)continue;const [sx,sy]=apply(inv,x,y);if(sx>=0&&sy>=0&&sx<=layer.native_size[0]&&sy<=layer.native_size[1]){selectLayer(layer.id);drag={x,y};e.currentTarget.setPointerCapture(e.pointerId);break}}});$('mosaicCanvas').addEventListener('pointermove',e=>{if(!drag)return;const box=e.currentTarget.getBoundingClientRect(),x=(e.clientX-box.left)/canvasScale,y=(e.clientY-box.top)/canvasScale,layer=selected();layer.matrix=normalize(multiply(translate(x-drag.x,y-drag.y),layer.matrix));drag={x,y};renderCanvas()});for(const event of ['pointerup','pointercancel','pointerleave'])$('mosaicCanvas').addEventListener(event,()=>drag=null);
 $('alpha').oninput=()=>{const layer=selected();if(layer){layer.opacity=+$('alpha').value;renderCanvas()}};let controlScale=1,controlRotation=0;$('scale').oninput=()=>{const value=+$('scale').value;applyDelta([value/controlScale,0,0,0,value/controlScale,0,0,0,1]);controlScale=value};$('rotation').oninput=()=>{const next=+$('rotation').value,delta=(next-controlRotation)*Math.PI/180,c=Math.cos(delta),s=Math.sin(delta);applyDelta([c,-s,0,s,c,0,0,0,1]);controlRotation=next};$('flipHorizontal').onclick=()=>applyDelta([-1,0,0,0,1,0,0,0,1]);$('flipVertical').onclick=()=>applyDelta([1,0,0,0,-1,0,0,0,1]);$('resetLayer').onclick=()=>{const layer=selected();if(layer){layer.matrix=identityFor(layer);controlScale=1;controlRotation=0;$('scale').value=1;$('rotation').value=0;renderCanvas()}};
 $('saveAll').onclick=async()=>{try{const r=await api('/api/calibration/transforms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({revision,transforms:layers.map(l=>({pair:l.pair,source:l.source,matrix:l.matrix}))})});revision=r.revision;$('calibrationStatus').textContent=`Saved ${r.count} directly placed layer transforms. Layout remains uncalibrated.`}catch(e){$('calibrationStatus').textContent=e.message}};
+let motionCalibration=null;$('recordMotion').onclick=async()=>{try{$('recordMotion').disabled=true;$('motionResult').textContent='Recording controlled motion pass...';const result=await api('/api/motion/calibrate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({motion_pair_name:$('motionPair').value,known_distance_meters:+$('motionDistance').value,duration_seconds:+$('motionDuration').value,direction:+$('motionDirection').value})});motionCalibration=result;$('saveMotion').disabled=false;$('motionResult').textContent=`usable samples: ${result.usable_samples}/${result.samples}\nmean confidence: ${result.mean_response.toFixed(3)}\nmedian interval: ${result.median_interval_seconds.toFixed(3)} s\nobserved motion: ${result.total_motion_pixels.map(v=>v.toFixed(1)).join(', ')} camera px\nrecommended max step: ${result.recommended_max_motion_step_pixels} canvas px\nrecommended max speed: ${result.recommended_max_traversal_speed_mps.toFixed(2)} m/s\nmotion_to_canvas:\n${result.motion_to_canvas.map(row=>row.map(v=>v.toFixed(5)).join('  ')).join('\n')}` }catch(e){$('motionResult').textContent=e.message}finally{$('recordMotion').disabled=false}};$('saveMotion').onclick=async()=>{if(!motionCalibration)return;try{const r=await api('/api/motion/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({revision,motion_pair_name:motionCalibration.motion_pair_name,motion_to_canvas:motionCalibration.motion_to_canvas,apply_recommendations:$('applyMotionLimits').checked,recommended_max_motion_step_pixels:motionCalibration.recommended_max_motion_step_pixels,recommended_max_traversal_speed_mps:motionCalibration.recommended_max_traversal_speed_mps})});revision=r.revision;$('motionResult').textContent+='\nSaved motion calibration. Layout remains uncalibrated.'}catch(e){$('motionResult').textContent=e.message}};
 async function refreshRadar(){if(mode!=='bench')return;try{renderRadar(await api('/api/radar'))}catch(e){$('radarIndicator').textContent='Radar: unavailable'}}
 status(true);scans();setInterval(scans,10000);setInterval(()=>{if(mode==='bench'){refreshPreviews();layers.forEach(refreshLayerImage);status(false)}},1000);setInterval(refreshRadar,150);
 </script></body></html>"""
@@ -268,6 +269,15 @@ def rectify(image, pair, source):
     return cv2.undistort(image, matrix, distortion), True
 
 
+def motion_estimate(previous_frame, current_frame, roi):
+    x, y, width, height = roi
+    previous_gray = cv2.cvtColor(previous_frame, cv2.COLOR_BGR2GRAY)[y:y + height, x:x + width]
+    current_gray = cv2.cvtColor(current_frame, cv2.COLOR_BGR2GRAY)[y:y + height, x:x + width]
+    if previous_gray.shape != (height, width) or current_gray.shape != (height, width):
+        raise ValueError("motion_roi is outside the selected motion source frame")
+    return cv2.phaseCorrelate(np.float32(previous_gray), np.float32(current_gray))
+
+
 def create_app(mode):
     app = Flask(__name__)
     layout = load_json(LAYOUT_PATH)
@@ -353,6 +363,8 @@ def create_app(mode):
                 "calibrated": bool(layout.get("calibrated")),
                 "revision": layout_revision(layout),
                 "strip": layout["strip"],
+                "motion_pair_name": layout["motion_pair_name"],
+                "motion_pairs": [pair["name"] for pair in layout["pairs"] if any(source["pair"] == pair["name"] and source["source"] == "visible" and source["available"] for source in available_sources())],
                 "visible": [
                     {**source, "source_id": visible["id"]}
                     for source, visible, _camera in bench.cameras.values()
@@ -474,6 +486,100 @@ def create_app(mode):
             save_layout(candidate)
             layout = candidate
             return jsonify(count=len(records), revision=layout_revision(layout))
+
+    @app.post("/api/motion/calibrate")
+    def calibrate_motion():
+        body = request.get_json(silent=True) or {}
+        pair_name = body.get("motion_pair_name")
+        known_distance = body.get("known_distance_meters")
+        duration = body.get("duration_seconds")
+        direction = body.get("direction")
+        if not isinstance(known_distance, (int, float)) or known_distance <= 0 or not isinstance(duration, (int, float)) or not 1 <= duration <= 15 or direction not in {-1, 1}:
+            return jsonify(error="Provide positive known distance, 1-15 second duration, and direction of 1 or -1"), 400
+        with layout_lock:
+            pair = pair_by_name(pair_name)
+            if pair is None:
+                return jsonify(error="Select a known motion pair"), 400
+            source_info = next((item for item in available_sources() if item["pair"] == pair_name and item["source"] == "visible"), None)
+            if source_info is None or not source_info["available"]:
+                return jsonify(error="Selected motion pair is not available in bench mode"), 400
+            roi = layout["motion_roi"]
+            pixels_per_meter = layout["canvas"]["pixels_per_meter"]
+            minimum_response = layout["min_motion_response"]
+
+        frames = []
+        deadline = time.monotonic() + duration
+        while time.monotonic() < deadline:
+            frame, _rectified = rectify(bench.visible(source_info["index"]), pair, "visible")
+            frames.append((time.monotonic(), frame))
+            time.sleep(0.05)
+        if len(frames) < 3:
+            return jsonify(error="Not enough motion frames were captured"), 400
+
+        motions = []
+        responses = []
+        intervals = []
+        for (previous_time, previous), (current_time, current) in zip(frames, frames[1:]):
+            motion, response = motion_estimate(previous, current, roi)
+            if response >= minimum_response:
+                motions.append(motion)
+                responses.append(response)
+                intervals.append(current_time - previous_time)
+        if len(motions) < 2:
+            return jsonify(error="Motion confidence was too low; use a sharper high-contrast target and retry"), 400
+
+        total_motion = np.sum(np.asarray(motions), axis=0)
+        dominant_axis = int(np.argmax(np.abs(total_motion)))
+        dominant_motion = float(total_motion[dominant_axis])
+        if abs(dominant_motion) < 1:
+            return jsonify(error="Measured motion was too small; increase target travel distance and retry"), 400
+        scale = direction * known_distance * pixels_per_meter / dominant_motion
+        motion_to_canvas = [[0.0, 0.0], [0.0, 0.0]]
+        motion_to_canvas[1][dominant_axis] = scale
+        canvas_steps = np.abs(np.asarray(motions)[:, dominant_axis] * scale)
+        median_interval = float(np.median(intervals))
+        # Preserve at least 50% longitudinal overlap between adjacent fixed strips.
+        recommended_step = max(1, int(np.floor(layout["strip"]["height"] * 0.5)))
+        recommended_speed = float(recommended_step / pixels_per_meter / median_interval)
+        return jsonify({
+            "motion_pair_name": pair_name,
+            "motion_to_canvas": motion_to_canvas,
+            "samples": len(frames),
+            "usable_samples": len(motions),
+            "total_motion_pixels": [float(total_motion[0]), float(total_motion[1])],
+            "mean_response": float(np.mean(responses)),
+            "median_interval_seconds": median_interval,
+            "recommended_max_motion_step_pixels": recommended_step,
+            "recommended_max_traversal_speed_mps": recommended_speed,
+        })
+
+    @app.post("/api/motion/save")
+    def save_motion():
+        nonlocal layout
+        body = request.get_json(silent=True) or {}
+        matrix = np.asarray(body.get("motion_to_canvas"), dtype=np.float64)
+        pair_name = body.get("motion_pair_name")
+        if matrix.shape != (2, 2) or not np.isfinite(matrix).all() or not np.any(matrix):
+            return jsonify(error="motion_to_canvas must be a nonzero finite 2x2 matrix"), 400
+        with layout_lock:
+            if body.get("revision") != layout_revision(layout):
+                return jsonify(error="Layout changed in another session; reload before saving"), 409
+            if pair_by_name(pair_name) is None:
+                return jsonify(error="Select a known motion pair"), 400
+            candidate = copy.deepcopy(layout)
+            candidate["motion_pair_name"] = pair_name
+            candidate["motion_to_canvas"] = matrix.tolist()
+            if body.get("apply_recommendations"):
+                step = body.get("recommended_max_motion_step_pixels")
+                speed = body.get("recommended_max_traversal_speed_mps")
+                if not isinstance(step, int) or step <= 0 or not isinstance(speed, (int, float)) or speed <= 0:
+                    return jsonify(error="Motion recommendations are invalid"), 400
+                candidate["max_motion_step_pixels"] = step
+                candidate["max_traversal_speed_mps"] = speed
+            candidate["calibrated"] = False
+            save_layout(candidate)
+            layout = candidate
+            return jsonify(revision=layout_revision(layout))
 
     @app.get("/api/scans")
     def scans():

@@ -82,6 +82,15 @@ measure speed. `minimum_capture_duration_seconds` and
 Set `max_pair_skew_seconds` from the worst measured interval between a mapped
 visible capture and its MLX90640 read.
 
+## Motion Calibration Mode
+
+Use the browser Motion Calibration panel with a sharp calibration target on a
+flat surface. Select the motion pair, enter the target's known travel distance,
+choose the intended final-image direction, and record a controlled pass. The
+tool uses the same motion ROI and phase-correlation method as deployed capture
+to estimate `motion_to_canvas`, report confidence and capture interval, and
+recommend a conservative speed limit. Saving never enables deployed capture.
+
 ## Thermal Interpretation
 
 `thermal_range_c` is a fixed technician-visible Celsius scale. Set it to the
