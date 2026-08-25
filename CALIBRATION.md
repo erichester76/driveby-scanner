@@ -43,6 +43,36 @@ Use a calibration target at the undercarriage plane. Populate:
 Recalibrate after changing camera positions, focus, sensor orientation, or the
 imaging-plane height.
 
+## Automated Visible Lens Calibration
+
+The browser Lens Calibration panel automates visible-camera intrinsics using a
+flat printed checkerboard. Enter the number of inner corners, for example `9x6`,
+and the measured square size in millimeters. At the scan plane, collect at
+least 15 sharp views with the board moved and tilted across the full image. The
+tool saves `visible_camera_matrix` and distortion coefficients at the actual
+configured visible-source resolution, while keeping `calibrated: false`.
+
+Use one fixed printed board size per calibration. A tiny, blurred, or repeated
+center-only board view is rejected or produces a poor model. Re-run calibration
+after changing focus, source resolution, or mounting geometry.
+
+## Thermal Footprint
+
+The thermal sensor does not need the same mounting distance as a visible
+camera. It needs a calibrated field-of-view footprint covering the same physical
+area of the scan plane that its paired visible layer represents.
+
+MLX90640's low 32x24 resolution means its pixels cover a much larger physical
+area than visible pixels. With its wide field of view, it is often mounted
+farther from the scan plane than a visible camera, or its useful footprint is
+limited in `thermal_to_strip`. Select distance by measuring the real footprint
+on a flat target, not by trying to match camera resolutions or mounting heights.
+
+A printed checkerboard normally lacks thermal contrast. Calibrate thermal
+placement using a target visible in both spectra at the scan plane, such as
+heated/cooled metal markers or thermal-contrast fiducials. Fit the resulting
+thermal observations directly into `thermal_to_strip`.
+
 ## Browser Strip Editor
 
 Place each source directly in the fixed sensor strip. Arrange source fields

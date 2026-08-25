@@ -28,7 +28,7 @@ PAGE = """<!doctype html>
 <header><div><div class="mode" id="mode"></div><h1>Undercarriage Scan Console</h1></div><div class="status" id="status">Connecting...</div></header>
 <div class="notice" id="notice"></div>
 <section id="bench"><div class="controls"><div class="radar" id="radarIndicator">Radar: not wired</div><button id="snapshot">Save bench snapshot</button><button class="secondary" id="toggle">Open strip editor</button></div><div class="grid" id="feeds"></div>
-<div class="panel calibration" id="calibration"><h2>Fixed Sensor Strip Editor</h2><p class="help"><strong>Build the scanner light bar:</strong> align left, center, and right sources into one fixed cross-car strip with only their measured overlap. This saves fixed <code>source -> strip</code> geometry. During a pass, the car moves over this fixed strip, so each captured strip is placed farther along the travel axis to create the complete underbody image.</p><div class="workspace"><div><div class="layers" id="layers"></div><div class="canvas-wrap"><canvas id="mosaicCanvas"></canvas></div></div><aside><h2 id="selectedTitle">Select a layer</h2><div class="controls"><label>Opacity <input id="alpha" type="range" min="0.1" max="1" value="0.6" step="0.05"></label><label>Scale <input id="scale" type="range" min="0.5" max="1.8" value="1" step="0.005"></label><label>Rotation <input id="rotation" type="range" min="-30" max="30" value="0" step="0.1"></label></div><div class="controls"><button class="secondary" id="flipHorizontal">Flip horizontal</button><button class="secondary" id="flipVertical">Flip vertical</button></div><div class="controls"><button class="secondary" id="resetLayer">Reset layer</button><button id="saveAll">Save strip layout</button></div><div class="readout" id="transformReadout"></div><p class="help">A <code>raw</code> source has no lens coefficients yet. Direct placement still saves its strip position, but calibrate lens coefficients before trusting the final geometric alignment.</p><span class="status" id="calibrationStatus"></span></aside></div><div class="panel"><h2>Motion Calibration</h2><p class="help">Place a high-contrast target on a flat surface, move it through the selected motion camera field by the measured distance, and record the controlled pass. This establishes how camera-pixel movement becomes final-canvas travel. It does not use the radar.</p><div class="controls"><label>Motion pair <select id="motionPair"></select></label><label>Known target travel (m) <input id="motionDistance" type="number" value="1" min="0.1" step="0.01"></label><label>Record duration (s) <input id="motionDuration" type="number" value="4" min="1" max="15" step="0.5"></label><label>Canvas direction <select id="motionDirection"><option value="1">Down</option><option value="-1">Up</option></select></label><button id="recordMotion">Record test pass</button><button class="secondary" id="saveMotion" disabled>Save motion calibration</button></div><label><input id="applyMotionLimits" type="checkbox"> Apply recommended maximum step and speed limits</label><div class="readout" id="motionResult">Record a known-distance pass to calculate motion_to_canvas.</div></div></div></section>
+<div class="panel calibration" id="calibration"><h2>Fixed Sensor Strip Editor</h2><p class="help"><strong>Build the scanner light bar:</strong> align left, center, and right sources into one fixed cross-car strip with only their measured overlap. This saves fixed <code>source -> strip</code> geometry. During a pass, the car moves over this fixed strip, so each captured strip is placed farther along the travel axis to create the complete underbody image.</p><div class="workspace"><div><div class="layers" id="layers"></div><div class="canvas-wrap"><canvas id="mosaicCanvas"></canvas></div></div><aside><h2 id="selectedTitle">Select a layer</h2><div class="controls"><label>Opacity <input id="alpha" type="range" min="0.1" max="1" value="0.6" step="0.05"></label><label>Scale <input id="scale" type="range" min="0.5" max="1.8" value="1" step="0.005"></label><label>Rotation <input id="rotation" type="range" min="-30" max="30" value="0" step="0.1"></label></div><div class="controls"><button class="secondary" id="flipHorizontal">Flip horizontal</button><button class="secondary" id="flipVertical">Flip vertical</button></div><div class="controls"><button class="secondary" id="resetLayer">Reset layer</button><button id="saveAll">Save strip layout</button></div><div class="readout" id="transformReadout"></div><p class="help">A <code>raw</code> source has no lens coefficients yet. Direct placement still saves its strip position, but calibrate lens coefficients before trusting the final geometric alignment.</p><span class="status" id="calibrationStatus"></span></aside></div><div class="panel"><h2>Visible Lens Calibration</h2><p class="help">Use a flat printed checkerboard. Hold it at the scan plane and move/tilt it across the selected visible source until the counter reaches at least 15 diverse detections. The target must be fully visible; this saves visible intrinsics only, never deployment state.</p><div class="controls"><label>Visible pair <select id="lensPair"></select></label><label>Inner checkerboard corners <input id="checkerboardCorners" value="9x6" pattern="[0-9]+x[0-9]+"></label><label>Square size (mm) <input id="checkerboardSquare" type="number" value="25" min="1" step="0.1"></label><button id="startLens">Start collection</button><button class="secondary" id="captureLens" disabled>Capture board</button><button class="secondary" id="solveLens" disabled>Solve and save lens</button></div><div class="readout" id="lensResult">Start collection, then capture 15-30 sharp checkerboard views at the scan plane.</div></div><div class="panel"><h2>Motion Calibration</h2><p class="help">Place a high-contrast target on a flat surface, move it through the selected motion camera field by the measured distance, and record the controlled pass. This establishes how camera-pixel movement becomes final-canvas travel. It does not use the radar.</p><div class="controls"><label>Motion pair <select id="motionPair"></select></label><label>Known target travel (m) <input id="motionDistance" type="number" value="1" min="0.1" step="0.01"></label><label>Record duration (s) <input id="motionDuration" type="number" value="4" min="1" max="15" step="0.5"></label><label>Canvas direction <select id="motionDirection"><option value="1">Down</option><option value="-1">Up</option></select></label><button id="recordMotion">Record test pass</button><button class="secondary" id="saveMotion" disabled>Save motion calibration</button></div><label><input id="applyMotionLimits" type="checkbox"> Apply recommended maximum step and speed limits</label><div class="readout" id="motionResult">Record a known-distance pass to calculate motion_to_canvas.</div></div></div></section>
 <section><h2>Technician inspections</h2><div class="scans" id="scans"></div></section>
 </main><script>
 const mode={{ mode|tojson }};let info={},layers=[],selectedId=null,drag=null,canvasScale=1,revision=null;
@@ -51,7 +51,7 @@ function setupLayers(){layers=info.sources.filter(s=>s.available).map(s=>{const 
 function applyDelta(delta){const layer=selected();if(!layer)return;const [x,y]=center(layer);layer.matrix=normalize(multiply(around(x,y,delta),layer.matrix));renderCanvas()}
 function preview(kind,index){return kind==='visible'?`/api/preview/visible.jpg?source_id=${encodeURIComponent(index)}`:`/api/preview/thermal/${index}.jpg`}
 function renderRadar(radar){const e=$('radarIndicator');e.textContent=radar.enabled?(radar.detected?`Radar: vehicle detected (GPIO ${radar.raw_value})`:`Radar: clear (GPIO ${radar.raw_value})`):'Radar: not wired';e.classList.toggle('active',Boolean(radar.detected))}
-async function status(initial=false){try{info=await api('/api/status');revision=info.revision;$('mode').textContent=info.mode;$('status').textContent=info.message;$('notice').textContent=info.calibrated?'Calibration is marked active. Review artifacts and coverage before unattended operation.':'Bench mode is safe for uncalibrated hardware. Deployed capture refuses to emit uncalibrated inspection images.';renderRadar(info.radar);if(mode==='bench'&&initial){$('feeds').innerHTML=info.visible.map(s=>feed('visible',s.source_id,s.name)).join('')+info.thermal.map((s,i)=>feed('thermal',i,s.name+' thermal',true)).join('');$('motionPair').innerHTML=info.motion_pairs.map(p=>`<option value="${p}">${p}</option>`).join('');$('motionPair').value=info.motion_pair_name||info.motion_pairs[0]||'';setupLayers();refreshPreviews()}else if(mode!=='bench')$('bench').hidden=true}catch(e){$('status').textContent=e.message}}
+async function status(initial=false){try{info=await api('/api/status');revision=info.revision;$('mode').textContent=info.mode;$('status').textContent=info.message;$('notice').textContent=info.calibrated?'Calibration is marked active. Review artifacts and coverage before unattended operation.':'Bench mode is safe for uncalibrated hardware. Deployed capture refuses to emit uncalibrated inspection images.';renderRadar(info.radar);if(mode==='bench'&&initial){$('feeds').innerHTML=info.visible.map(s=>feed('visible',s.source_id,s.name)).join('')+info.thermal.map((s,i)=>feed('thermal',i,s.name+' thermal',true)).join('');const visiblePairs=info.sources.filter(s=>s.source==='visible'&&s.available).map(s=>s.pair);$('motionPair').innerHTML=visiblePairs.map(p=>`<option value="${p}">${p}</option>`).join('');$('lensPair').innerHTML=visiblePairs.map(p=>`<option value="${p}">${p}</option>`).join('');$('motionPair').value=info.motion_pair_name||visiblePairs[0]||'';setupLayers();refreshPreviews()}else if(mode!=='bench')$('bench').hidden=true}catch(e){$('status').textContent=e.message}}
 async function scans(){try{const data=await api('/api/scans');$('scans').innerHTML=data.scans.length?data.scans.map(s=>`<article class="scan"><a href="/captures/${s.image}" target="_blank"><img src="/captures/${s.image}" loading="lazy"><strong>${s.event_id}</strong></a><div class="status">${s.stats}</div></article>`).join(''):'<p class="status">No deployed inspection mosaics yet.</p>'}catch(e){$('scans').textContent=e.message}}
 async function refreshPreview(image){if(image.dataset.loading)return;image.dataset.loading='1';try{const r=await fetch(preview(image.dataset.previewKind,image.dataset.previewIndex),{cache:'no-store'});if(!r.ok)throw Error(`Preview HTTP ${r.status}`);const url=URL.createObjectURL(await r.blob()),previous=image.dataset.objectUrl;image.src=url;image.dataset.objectUrl=url;if(previous)URL.revokeObjectURL(previous)}catch(e){image.alt=e.message}finally{delete image.dataset.loading}}
 function refreshPreviews(){document.querySelectorAll('.feed[data-preview-kind]').forEach(refreshPreview)}
@@ -60,6 +60,7 @@ $('mosaicCanvas').addEventListener('pointerdown',e=>{const box=e.currentTarget.g
 $('alpha').oninput=()=>{const layer=selected();if(layer){layer.opacity=+$('alpha').value;renderCanvas()}};let controlScale=1,controlRotation=0;$('scale').oninput=()=>{const value=+$('scale').value;applyDelta([value/controlScale,0,0,0,value/controlScale,0,0,0,1]);controlScale=value};$('rotation').oninput=()=>{const next=+$('rotation').value,delta=(next-controlRotation)*Math.PI/180,c=Math.cos(delta),s=Math.sin(delta);applyDelta([c,-s,0,s,c,0,0,0,1]);controlRotation=next};$('flipHorizontal').onclick=()=>applyDelta([-1,0,0,0,1,0,0,0,1]);$('flipVertical').onclick=()=>applyDelta([1,0,0,0,-1,0,0,0,1]);$('resetLayer').onclick=()=>{const layer=selected();if(layer){layer.matrix=identityFor(layer);controlScale=1;controlRotation=0;$('scale').value=1;$('rotation').value=0;renderCanvas()}};
 $('saveAll').onclick=async()=>{try{const r=await api('/api/calibration/transforms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({revision,transforms:layers.map(l=>({pair:l.pair,source:l.source,matrix:l.matrix}))})});revision=r.revision;$('calibrationStatus').textContent=`Saved ${r.count} directly placed layer transforms. Layout remains uncalibrated.`}catch(e){$('calibrationStatus').textContent=e.message}};
 let motionCalibration=null;$('recordMotion').onclick=async()=>{try{$('recordMotion').disabled=true;$('motionResult').textContent='Recording controlled motion pass...';const result=await api('/api/motion/calibrate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({motion_pair_name:$('motionPair').value,known_distance_meters:+$('motionDistance').value,duration_seconds:+$('motionDuration').value,direction:+$('motionDirection').value})});motionCalibration=result;$('saveMotion').disabled=false;$('motionResult').textContent=`usable samples: ${result.usable_samples}/${result.samples}\nmean confidence: ${result.mean_response.toFixed(3)}\nmedian interval: ${result.median_interval_seconds.toFixed(3)} s\nobserved motion: ${result.total_motion_pixels.map(v=>v.toFixed(1)).join(', ')} camera px\nrecommended max step: ${result.recommended_max_motion_step_pixels} canvas px\nrecommended max speed: ${result.recommended_max_traversal_speed_mps.toFixed(2)} m/s\nmotion_to_canvas:\n${result.motion_to_canvas.map(row=>row.map(v=>v.toFixed(5)).join('  ')).join('\n')}` }catch(e){$('motionResult').textContent=e.message}finally{$('recordMotion').disabled=false}};$('saveMotion').onclick=async()=>{if(!motionCalibration)return;try{const r=await api('/api/motion/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({revision,motion_pair_name:motionCalibration.motion_pair_name,motion_to_canvas:motionCalibration.motion_to_canvas,apply_recommendations:$('applyMotionLimits').checked,recommended_max_motion_step_pixels:motionCalibration.recommended_max_motion_step_pixels,recommended_max_traversal_speed_mps:motionCalibration.recommended_max_traversal_speed_mps})});revision=r.revision;$('motionResult').textContent+='\nSaved motion calibration. Layout remains uncalibrated.'}catch(e){$('motionResult').textContent=e.message}};
+let lensSession=null;$('startLens').onclick=async()=>{try{const result=await api('/api/lens/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pair_name:$('lensPair').value,corner_pattern:$('checkerboardCorners').value,square_size_mm:+$('checkerboardSquare').value})});lensSession=result.session_id;$('captureLens').disabled=false;$('solveLens').disabled=true;$('lensResult').textContent=`Collection started for ${result.pair_name}. Move the checkerboard across the full image and press Capture board for each distinct pose.`}catch(e){$('lensResult').textContent=e.message}};$('captureLens').onclick=async()=>{if(!lensSession)return;try{const result=await api('/api/lens/capture',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session_id:lensSession})});$('lensResult').textContent=`Accepted views: ${result.views}. Last board coverage: ${result.coverage.toFixed(1)}%`;if(result.views>=15)$('solveLens').disabled=false}catch(e){$('lensResult').textContent=e.message}};$('solveLens').onclick=async()=>{if(!lensSession)return;try{const result=await api('/api/lens/solve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session_id:lensSession})});revision=result.revision;$('lensResult').textContent=`Saved ${result.pair_name} lens calibration. RMS reprojection error: ${result.rms.toFixed(3)} px using ${result.views} views. Layout remains uncalibrated.`;$('captureLens').disabled=true;$('solveLens').disabled=true}catch(e){$('lensResult').textContent=e.message}};
 async function refreshRadar(){if(mode!=='bench')return;try{renderRadar(await api('/api/radar'))}catch(e){$('radarIndicator').textContent='Radar: unavailable'}}
 status(true);scans();setInterval(scans,10000);setInterval(()=>{if(mode==='bench'){refreshPreviews();layers.forEach(refreshLayerImage);status(false)}},1000);setInterval(refreshRadar,150);
 </script></body></html>"""
@@ -278,10 +279,21 @@ def motion_estimate(previous_frame, current_frame, roi):
     return cv2.phaseCorrelate(np.float32(previous_gray), np.float32(current_gray))
 
 
+def parse_corner_pattern(value):
+    try:
+        columns, rows = (int(item) for item in value.lower().split("x"))
+    except (AttributeError, ValueError):
+        raise ValueError("corner_pattern must be columnsxrows, for example 9x6") from None
+    if columns < 3 or rows < 3:
+        raise ValueError("checkerboard must have at least 3x3 inner corners")
+    return columns, rows
+
+
 def create_app(mode):
     app = Flask(__name__)
     layout = load_json(LAYOUT_PATH)
     layout_lock = threading.Lock()
+    lens_sessions = {}
     bench = None
     startup_error = None
     if mode == "bench":
@@ -580,6 +592,87 @@ def create_app(mode):
             save_layout(candidate)
             layout = candidate
             return jsonify(revision=layout_revision(layout))
+
+    @app.post("/api/lens/start")
+    def start_lens_calibration():
+        body = request.get_json(silent=True) or {}
+        pair_name = body.get("pair_name")
+        square_size = body.get("square_size_mm")
+        if not isinstance(square_size, (int, float)) or square_size <= 0:
+            return jsonify(error="square_size_mm must be positive"), 400
+        try:
+            pattern = parse_corner_pattern(body.get("corner_pattern"))
+        except ValueError as error:
+            return jsonify(error=str(error)), 400
+        with layout_lock:
+            pair = pair_by_name(pair_name)
+            source = next((item for item in available_sources() if item["pair"] == pair_name and item["source"] == "visible"), None)
+            if pair is None or source is None or not source["available"]:
+                return jsonify(error="Selected visible pair is not available in bench mode"), 400
+            session_id = datetime.now().strftime("lens_%Y%m%d_%H%M%S_%f")
+            lens_sessions[session_id] = {
+                "pair_name": pair_name,
+                "pattern": pattern,
+                "square_size_mm": float(square_size),
+                "corners": [],
+                "image_size": None,
+            }
+            return jsonify(session_id=session_id, pair_name=pair_name)
+
+    @app.post("/api/lens/capture")
+    def capture_lens_view():
+        body = request.get_json(silent=True) or {}
+        session = lens_sessions.get(body.get("session_id"))
+        if session is None:
+            return jsonify(error="Lens calibration session was not found; start a new collection"), 404
+        with layout_lock:
+            pair = pair_by_name(session["pair_name"])
+            source = next((item for item in available_sources() if item["pair"] == session["pair_name"] and item["source"] == "visible"), None)
+            if pair is None or source is None or not source["available"]:
+                return jsonify(error="Selected visible pair is not available in bench mode"), 400
+        frame, _rectified = rectify(bench.visible(source["index"]), pair, "visible")
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        found, corners = cv2.findChessboardCornersSB(gray, session["pattern"], flags=cv2.CALIB_CB_NORMALIZE_IMAGE)
+        if not found:
+            return jsonify(error="Checkerboard was not detected; ensure all inner corners are visible and in focus"), 400
+        coverage = float(cv2.contourArea(cv2.convexHull(corners.astype(np.float32))) / (gray.shape[0] * gray.shape[1]) * 100)
+        if coverage < 2:
+            return jsonify(error="Checkerboard is too small in the image; move it closer and retry"), 400
+        if session["image_size"] is None:
+            session["image_size"] = (gray.shape[1], gray.shape[0])
+        elif session["image_size"] != (gray.shape[1], gray.shape[0]):
+            return jsonify(error="Visible source resolution changed during collection"), 400
+        session["corners"].append(corners.astype(np.float32))
+        return jsonify(views=len(session["corners"]), coverage=coverage)
+
+    @app.post("/api/lens/solve")
+    def solve_lens_calibration():
+        nonlocal layout
+        body = request.get_json(silent=True) or {}
+        session = lens_sessions.get(body.get("session_id"))
+        if session is None:
+            return jsonify(error="Lens calibration session was not found; start a new collection"), 404
+        if len(session["corners"]) < 15:
+            return jsonify(error="Collect at least 15 distinct checkerboard views before solving"), 400
+        columns, rows = session["pattern"]
+        object_points = np.zeros((columns * rows, 3), dtype=np.float32)
+        object_points[:, :2] = np.mgrid[0:columns, 0:rows].T.reshape(-1, 2) * session["square_size_mm"]
+        rms, camera_matrix, distortion, _rvecs, _tvecs = cv2.calibrateCamera(
+            [object_points] * len(session["corners"]), session["corners"], session["image_size"], None, None
+        )
+        with layout_lock:
+            pair = pair_by_name(session["pair_name"])
+            if pair is None:
+                return jsonify(error="Selected pair no longer exists"), 400
+            candidate = copy.deepcopy(layout)
+            next_pair = next(item for item in candidate["pairs"] if item["name"] == session["pair_name"])
+            next_pair["visible_camera_matrix"] = camera_matrix.tolist()
+            next_pair["visible_distortion_coefficients"] = distortion.reshape(-1).tolist()
+            candidate["calibrated"] = False
+            save_layout(candidate)
+            layout = candidate
+            lens_sessions.pop(body.get("session_id"), None)
+            return jsonify(pair_name=session["pair_name"], views=len(session["corners"]), rms=float(rms), revision=layout_revision(layout))
 
     @app.get("/api/scans")
     def scans():
